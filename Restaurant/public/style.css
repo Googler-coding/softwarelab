@@ -1,0 +1,59 @@
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+#restaurant-search {
+  margin-top: 20px;
+  padding: 8px;
+  width: 250px;
+  font-size: 16px;
+  position: relative; /* Position relative to allow absolute positioning for suggestions */
+  z-index: 5;
+}
+
+#suggestions {
+  margin-top: 5px;
+  list-style-type: none;
+  padding: 0;
+  background-color: white;
+  width: 250px;
+  margin-left: auto;
+  margin-right: auto;
+  position: absolute;
+  z-index: 10;
+  box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 4px;
+  max-height: 200px; /* Limit the height to prevent excessive expansion */
+  overflow-y: auto; /* Allow vertical scrolling */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Hide scrollbar but keep scroll functionality */
+#suggestions::-webkit-scrollbar {
+  display: none; /* Hide the scrollbar in WebKit-based browsers */
+}
+
+#suggestions li {
+  padding: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+#suggestions li:hover {
+  background-color: #f0f0f0; /* Highlight the suggestion when hovered */
+}
+
+#suggestions li.selected {
+  background-color: #f0f0f0; /* Keep the background color after selecting */
+}
+
+
+
+#map {
+  margin-top: 70px;
+  margin-bottom: 20px;
+  left: 50%;
+  transform:translateX(-50%);
+}

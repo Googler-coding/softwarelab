@@ -1,0 +1,44 @@
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  .app-container {
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  
+  /* Middle Section Container */
+  #div_middle {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Each Middle Section */
+  #div_middle_part1,
+  #div_middle_part2,
+  #div_middle_part3,
+  #div_middle_part4,
+  #div_middle_part5,
+  #div_middle_part6 {
+    width: 100%;
+    padding: 20px 0;
+  }
+  
+  /* Specific Background Colors */
+  #div_middle_part3,
+  #div_middle_part5 {
+    background-color: #fef1ee;
+  }
+  
+  /* Footer Section */
+  #div_footer {
+    width: 100%;
+    background-color: #111;
+    color: white;
+    padding: 20px 0;
+    text-align: center;
+  }
+  

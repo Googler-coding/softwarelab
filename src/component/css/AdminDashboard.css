@@ -1,0 +1,42 @@
+.admin-dashboard {
+    padding: 2rem;
+    font-family: Arial, sans-serif;
+  }
+  
+  .admin-dashboard h2 {
+    margin-bottom: 1rem;
+    font-size: 2rem;
+    color: #333;
+  }
+  
+  .restaurant-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+  
+  .restaurant-table th,
+  .restaurant-table td {
+    padding: 10px;
+    text-align: left;
+    border: 1px solid #ddd;
+  }
+  
+  .restaurant-table th {
+    background-color: #f44336;
+    color: white;
+  }
+  
+  .restaurant-table td button {
+    background-color: #2196f3;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .restaurant-table td button:hover {
+    background-color: #0b7dda;
+  }
+  

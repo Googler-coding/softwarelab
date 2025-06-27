@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Delivery & Ordering Platform</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .restaurant, .menu-item { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
+    button { margin: 5px; }
+    #map { height: 400px; width: 50%; margin-top: 20px; }
+    #suggestions { list-style: none; padding: 0; position: absolute; background: white; border: 1px solid #ccc; }
+    #suggestions li { padding: 5px; cursor: pointer; }
+    #suggestions li:hover { background: #f0f0f0; }
+    #restaurant-search { width: 300px; padding: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Welcome to Food Delivery</h1>
+  <div>
+    <input id="restaurant-search" type="text" placeholder="Search for restaurants..." />
+    <ul id="suggestions"></ul>
+  </div>
+  <div id="map"></div>
+  <h2>Restaurants Near You</h2>
+  <div id="restaurant-list"></div>
+  <div id="menu-container" style="display: none;">
+    <h2>Menu</h2>
+    <div id="menu-list"></div>
+    <button id="order-btn" disabled>Place Order</button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    let selectedRestaurantId = null;
+    let cart = [];
+    let allRestaurants = [];
+    let map;
+    let markers = [];
+
+    function initMap() {
+      map = L.map('map').setView([23.8103, 90.4125], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+    }
+
+    function loadRestaurants() {
+      fetch('/api/restaurants')
+        .then(response => response.json())
+        .then(restaurants => {
+          allRestaurants = restaurants;
+          displayRestaurants(restaurants);
+          updateMap(restaurants);
+        })
+        .catch(error => console.error('Error fetching restaurants:', error));
+    }
+
+    function displayRestaurants(restaurants) {
+      const list = document.getElementById('restaurant-list');
+      list.innerHTML = '';
+      restaurants.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'restaurant';
+        div.innerHTML = `
+          <h3>${r.name} (${r.type})</h3>
+          <p>${r.location}</p>
+          <button onclick="showMenu('${r.id}')">View Menu</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function updateMap(restaurants) {
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = [];
+      restaurants.forEach(r => {
+        const marker = L.marker([r.lat, r.lon]).addTo(map)
+          .bindPopup(`<b>${r.name}</b><br>${r.type}`);
+        markers.push(marker);
+      });
+    }
+
+    document.getElementById('restaurant-search').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      const suggestions = document.getElementById('suggestions');
+      suggestions.innerHTML = '';
+      if (query.length < 2) return;
+      const filtered = allRestaurants.filter(r => 
+        r.name.toLowerCase().includes(query) || r.type.toLowerCase().includes(query)
+      );
+      filtered.forEach(r => {
+        const li = document.createElement('li');
+        li.textContent = `${r.name} (${r.type})`;
+        li.onclick = () => {
+          showMenu(r.id);
+          suggestions.innerHTML = '';
+          e.target.value = r.name;
+          map.setView([r.lat, r.lon], 15);
+        };
+        suggestions.appendChild(li);
+      });
+      displayRestaurants(filtered);
+      updateMap(filtered);
+    });
+
+    function showMenu(restaurantId) {
+      selectedRestaurantId = restaurantId;
+      console.log('Fetching menu for restaurant ID:', restaurantId);
+      fetch(`/api/restaurant/${restaurantId}/menu`)
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+          return response.json();
+        })
+        .then(menu => {
+          console.log('Menu data received:', menu);
+          const container = document.getElementById('menu-container');
+          const list = document.getElementById('menu-list');
+          list.innerHTML = '';
+          if (menu.length === 0) {
+            list.innerHTML = '<p>No menu items available for this restaurant.</p>';
+          } else {
+            menu.forEach(item => {
+              const div = document.createElement('div');
+              div.className = 'menu-item';
+              div.innerHTML = `
+                <p>${item.name} - $${item.price}</p>
+                <p>${item.description}</p>
+                <button onclick="addToCart('${item.id}', '${item.name}', ${item.price})">Add to Cart</button>
+              `;
+              list.appendChild(div);
+            });
+          }
+          container.style.display = 'block';
+          document.getElementById('order-btn').disabled = true;
+        })
+        .catch(error => console.error('Error fetching menu:', error));
+    }
+
+    function addToCart(id, name, price) {
+      cart.push({ id, name, price });
+      document.getElementById('order-btn').disabled = false;
+      alert(`${name} added to cart!`);
+    }
+
+    document.getElementById('order-btn').addEventListener('click', () => {
+      if (cart.length === 0) return;
+      fetch('/api/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId: selectedRestaurantId, items: cart })
+      })
+        .then(response => response.json())
+        .then(data => {
+          alert(data.message);
+          cart = [];
+          document.getElementById('order-btn').disabled = true;
+        })
+        .catch(error => console.error('Error placing order:', error));
+    });
+
+    initMap();
+    loadRestaurants();
+  </script>
+  <script src="script.js"></script>
+</body>
+</html>

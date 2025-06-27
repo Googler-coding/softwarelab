@@ -1,0 +1,189 @@
+/* Navbar */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 80px;
+    background-color: rgb(236, 234, 235);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 999;
+    padding: 0 30px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    color: black;
+  }
+  
+  .navbar-left {
+    display: flex;
+    align-items: center;
+  }
+  
+  .logo {
+    height: 60px;
+    width: 60px;
+    cursor: pointer;
+  }
+  
+  .navbar-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+  }
+  
+  .navbar-center a {
+    text-decoration: none;
+    color: black;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: color 0.3s ease;
+  }
+  
+  .navbar-center a:hover {
+    color: red;
+  }
+  
+  .navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .auth-button {
+    background-color: red;
+    color: whitesmoke;
+    font-weight: bold;
+    font-size: 13px;
+    width: 90px;
+    height: 40px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: transform 0.3s, background-color 0.3s;
+  }
+  
+  .auth-button:hover {
+    letter-spacing: 0.5px;
+    background-color: darkred;
+  }
+  
+  /* Popup Overlay */
+  .popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+  
+  /* Popup Box */
+  .popup {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    width: 350px;
+    position: relative;
+    text-align: center;
+    box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.2);
+    font-family: Arial, sans-serif;
+  }
+  
+  /* Popup Close Button */
+  .popup-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    border: none;
+    background: transparent;
+    font-size: 2.2rem;
+    cursor: pointer;
+    padding: 4px 10px;
+    margin: 0;
+    color: #555;
+    line-height: 1;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.3s ease;
+  }
+  
+  .popup-close:hover {
+    color: #e63946;
+  }
+  
+  /* Form Input Styling */
+  .form input {
+    width: 90%;
+    margin: 8px auto;
+    padding: 10px;
+    font-size: 1rem;
+    display: block;
+  }
+  
+  .form button {
+    margin-top: 12px;
+    padding: 10px 20px;
+    background: red!important;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .form button:hover {
+    background: darkred !important;
+    letter-spacing: 0.1px;
+  }
+  
+  /* Role Link Buttons */
+  .popup-link {
+    display: block;
+    margin: 10px auto;
+    padding: 10px;
+    background-color: #f4f4f4;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: 0.2s ease;
+    width: 90%;
+    border: none;
+  }
+  
+  .popup-link:hover {
+    background-color: red;
+    color: white;
+  }
+  
+  /* Auth Switch Text */
+  .switch-auth {
+    margin-top: 15px;
+    font-size: 0.9rem;
+  }
+  
+  .switch-auth span,
+  .switch-auth-btn {
+    color: red;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-left: 6px;
+    padding: 0;
+    background: none;
+    border: none;
+  }
+  
+  .switch-auth span:hover,
+  .switch-auth-btn:hover {
+    text-decoration: underline;
+  }
+  

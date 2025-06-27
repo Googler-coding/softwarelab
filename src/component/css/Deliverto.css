@@ -1,0 +1,37 @@
+.district-card {
+    border: none;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1; /* Square */
+    min-height: 220px; /* 🔥 Force bigger size */
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+  }
+  
+  .district-card img {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+  }
+  
+  .district-card:hover img {
+    transform: scale(1.08);
+  }
+  
+  .district-card .overlay {
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 20px;
+  }
+  
+  .district-link {
+    text-decoration: none;
+  }
+  
