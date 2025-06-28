@@ -41,28 +41,26 @@
 
 .floating-search-wrapper {
   position: relative;
-  width: 100%;
   max-width: 600px;
-  margin-bottom: 2rem;
+  margin: 0 auto 2rem;
 }
 
 .floating-search-input {
   width: 100%;
-  padding: 1rem 3rem 1rem 1.5rem;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 15px;
+  padding: 1.2rem 3rem 1.2rem 1.5rem;
   font-size: 1.1rem;
-  color: #2c3e50;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  border-radius: 15px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
 .floating-search-input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15), 0 12px 40px rgba(0, 0, 0, 0.15);
   outline: none;
+  border-color: #667eea;
+  box-shadow: 0 12px 35px rgba(102, 126, 234, 0.2);
   transform: translateY(-2px);
 }
 
@@ -72,14 +70,18 @@
   top: 50%;
   transform: translateY(-50%);
   background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
   border: none;
-  border-radius: 10px;
-  padding: 0.5rem;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   font-size: 1.2rem;
   cursor: pointer;
-  color: white;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-icon-btn:hover {
@@ -97,10 +99,12 @@
   border-radius: 15px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   margin-top: 0.5rem;
-  z-index: 1000;
+  z-index: 9999;
   list-style: none;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .suggestions-floating li {
@@ -131,11 +135,29 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
   margin-bottom: 2rem;
   border: 3px solid rgba(255, 255, 255, 0.2);
+  /* Debug styles */
+  position: relative;
+  z-index: 1000;
+}
+
+/* Ensure Leaflet map container is visible */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  z-index: 1 !important;
+}
+
+.leaflet-map-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-tile-pane {
+  z-index: 1 !important;
 }
 
 .order-section {
   width: 100%;
-  max-width: 800px;
+  max-width: 1000px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 20px;
@@ -143,6 +165,7 @@
   padding: 2rem;
   transition: all 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  margin: 0 auto;
 }
 
 .order-section:hover {
@@ -150,31 +173,43 @@
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.2);
 }
 
+.order-section h3 {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: #2c3e50;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
 .order-section p {
+  text-align: center;
   font-size: 1.1rem;
   color: #6c757d;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   font-weight: 500;
 }
 
 .menu-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
 
 .menu-item {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
   background: linear-gradient(135deg, #f8f9fa, #e9ecef);
   border-radius: 15px;
-  padding: 1.5rem;
+  padding: 1rem 1.2rem;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
   border: 1px solid rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
+  min-height: 65px;
+  gap: 0.8rem;
 }
 
 .menu-item::before {
@@ -188,51 +223,66 @@
 }
 
 .menu-item:hover {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
 }
 
 .menu-item span {
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 600;
   color: #2c3e50;
-  margin-bottom: 1rem;
   position: relative;
-  padding-right: 4rem;
+  padding-right: 70px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: 35px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.3;
 }
 
 .menu-item span::after {
   content: attr(data-price);
   position: absolute;
   right: 0;
-  top: 0;
-  font-size: 1.3rem;
-  font-weight: 800;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+  font-weight: 700;
   color: #667eea;
   background: linear-gradient(135deg, #667eea, #764ba2);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  white-space: nowrap;
 }
 
 .menu-item button {
-  padding: 0.875rem 1.5rem;
+  padding: 0.25rem 0.6rem;
   background: linear-gradient(135deg, #667eea, #764ba2);
   color: white;
   border: none;
-  border-radius: 12px;
-  font-size: 1.1rem;
-  font-weight: 700;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 3px 8px rgba(102, 126, 234, 0.3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+  min-width: 70px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .menu-item button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .cart {
@@ -241,6 +291,7 @@
   border-radius: 15px;
   padding: 2rem;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(102, 126, 234, 0.1);
 }
 
 .cart h4 {
@@ -249,39 +300,53 @@
   color: #2c3e50;
   font-size: 1.5rem;
   font-weight: 700;
+  position: relative;
+}
+
+.cart h4::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 2px;
 }
 
 .cart-item {
   display: flex;
-  flex-direction: column;
-  background: white;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.8);
   border-radius: 12px;
-  padding: 1.5rem;
   margin-bottom: 1rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(102, 126, 234, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .cart-item:hover {
-  transform: translateX(5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: rgba(102, 126, 234, 0.3);
 }
 
 .cart-item-content {
+  flex: 1;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .cart-item span {
   font-size: 1.1rem;
   font-weight: 600;
   color: #2c3e50;
-  flex: 1;
   position: relative;
-  padding-right: 4rem;
+  padding-right: 80px;
 }
 
 .cart-item span::after {
@@ -289,73 +354,76 @@
   position: absolute;
   right: 0;
   top: 0;
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #667eea;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .cart-item-controls {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-shrink: 0;
 }
 
 .qty-controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  background: #f8f9fa;
-  border-radius: 10px;
+  gap: 0.5rem;
+  background: rgba(102, 126, 234, 0.1);
   padding: 0.5rem;
+  border-radius: 8px;
 }
 
 .qty-controls button {
-  width: 36px;
-  height: 36px;
   background: linear-gradient(135deg, #667eea, #764ba2);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .qty-controls button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  transform: scale(1.05);
+  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
 }
 
 .qty-controls span {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   color: #2c3e50;
-  padding: 0;
-  min-width: 2rem;
+  min-width: 25px;
   text-align: center;
 }
 
 .cart-item button:not(.qty-controls button) {
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
   color: white;
   border: none;
-  border-radius: 10px;
-  font-size: 1rem;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  box-shadow: 0 3px 10px rgba(231, 76, 60, 0.2);
 }
 
 .cart-item button:not(.qty-controls button):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
 
 .cart-total {
@@ -366,6 +434,23 @@
   border-radius: 15px;
   color: white;
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.cart-total::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.cart-total:hover::before {
+  left: 100%;
 }
 
 .cart-total h4 {
@@ -373,35 +458,60 @@
   margin: 0;
   font-size: 1.8rem;
   font-weight: 800;
+  position: relative;
+  z-index: 1;
 }
 
 .place-order-btn {
-  width: 100%;
-  padding: 1rem 2rem;
-  background: linear-gradient(135deg, #43e97b, #38f9d7);
+  width: auto;
+  max-width: 300px;
+  margin: 0 auto;
+  display: block;
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, #28a745, #20c997);
   color: white;
   border: none;
-  border-radius: 15px;
-  font-size: 1.2rem;
-  font-weight: 800;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 25px rgba(67, 233, 123, 0.3);
+  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-top: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.place-order-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.place-order-btn:hover::before {
+  left: 100%;
 }
 
 .place-order-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 35px rgba(67, 233, 123, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
 }
 
 .place-order-btn:disabled {
-  background: #6c757d;
+  background: linear-gradient(135deg, #6c757d, #495057);
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
+  box-shadow: 0 3px 8px rgba(108, 117, 125, 0.2);
+}
+
+.place-order-btn:disabled::before {
+  display: none;
 }
 
 .error-message {
@@ -433,7 +543,7 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .inrestaurant-container {
-    padding: 1.5rem 0.75rem;
+    padding: 1rem 0.5rem;
   }
 
   .inrestaurant-container h2 {
@@ -449,7 +559,7 @@
   }
 
   .map-section {
-    height: 350px;
+    height: 400px;
   }
 
   .order-section {
@@ -460,37 +570,84 @@
     grid-template-columns: 1fr;
   }
 
-  .cart-item-content {
+  .menu-item {
     flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1rem;
+    text-align: center;
+    min-height: auto;
+  }
+
+  .menu-item span {
+    padding-right: 0;
+    text-align: center;
+    justify-content: center;
+    min-height: auto;
+    width: 100%;
+    font-size: 0.95rem;
+  }
+
+  .menu-item span::after {
+    position: static;
+    display: block;
+    margin-top: 0.5rem;
+    text-align: center;
+    transform: none;
+    white-space: normal;
+    font-size: 0.85rem;
+  }
+
+  .menu-item button {
+    align-self: center;
+    min-width: 90px;
+    height: 32px;
+    margin: 0;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.7rem;
+  }
+
+  .cart-item {
+    flex-direction: column;
+    align-items: stretch;
     gap: 1rem;
-    align-items: flex-start;
   }
 
   .cart-item span {
     padding-right: 0;
     text-align: center;
-    width: 100%;
   }
 
   .cart-item span::after {
     position: static;
-    margin-left: 1rem;
+    display: block;
+    margin-top: 0.5rem;
+    text-align: center;
   }
 
   .cart-item-controls {
-    width: 100%;
-    justify-content: space-between;
+    justify-content: center;
+    flex-wrap: wrap;
   }
 
   .qty-controls {
-    width: 100%;
-    justify-content: center;
+    order: 1;
+  }
+
+  .cart-item button:not(.qty-controls button) {
+    order: 2;
+  }
+
+  .place-order-btn {
+    max-width: 250px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
   }
 }
 
 @media (max-width: 480px) {
   .inrestaurant-container {
-    padding: 1rem 0.5rem;
+    padding: 0.5rem;
   }
 
   .inrestaurant-container h2 {
@@ -498,24 +655,40 @@
   }
 
   .map-section {
-    height: 300px;
+    height: 350px;
+  }
+
+  .menu-item {
+    padding: 0.8rem;
+    gap: 0.6rem;
   }
 
   .menu-item span,
-  .cart-item span,
-  .menu-item span::after,
-  .cart-item span::after {
-    font-size: 1rem;
+  .cart-item span {
+    font-size: 0.85rem;
   }
 
   .menu-item button,
-  .cart-item button:not(.qty-controls button),
-  .place-order-btn {
-    font-size: 1rem;
+  .cart-item button {
+    font-size: 0.7rem;
+  }
+
+  .menu-item button {
+    padding: 0.2rem 0.5rem;
+    min-width: 80px;
+    font-size: 0.65rem;
+    height: 28px;
   }
 
   .qty-controls button {
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
+    font-size: 0.9rem;
+  }
+
+  .place-order-btn {
+    max-width: 200px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
   }
 }

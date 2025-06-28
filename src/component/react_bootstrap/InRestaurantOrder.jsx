@@ -4,13 +4,22 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../css/InRestaurantOrder.css";
 
-const redIcon = new L.Icon({
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x-red.png",
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x-red.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+// Use default icon to avoid loading issues
+const defaultIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+// Restaurant icon
+const restaurantIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -46,9 +55,11 @@ const InRestaurantOrder = () => {
   useEffect(() => {
     // Check if user is logged in
     if (token) {
+      console.log("Token found:", token.substring(0, 20) + "...");
       setIsLoggedIn(true);
       fetchRestaurants();
     } else {
+      console.log("No token found, user not logged in");
       setError("Please log in to view restaurants");
     }
 
@@ -57,14 +68,21 @@ const InRestaurantOrder = () => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const coords = [pos.coords.latitude, pos.coords.longitude];
+          console.log("User location obtained:", coords);
           setUserLocation(coords);
         },
-        () => {
+        (error) => {
+          console.log("Geolocation error:", error);
           // Fallback to Dhaka coordinates
           const fallback = [23.8103, 90.4125];
+          console.log("Using fallback location:", fallback);
           setUserLocation(fallback);
         }
       );
+    } else {
+      console.log("Geolocation not supported, using fallback");
+      const fallback = [23.8103, 90.4125];
+      setUserLocation(fallback);
     }
   }, [token]);
 
@@ -78,8 +96,17 @@ const InRestaurantOrder = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch restaurants");
-      setRestaurants(data);
+      
+      console.log("Fetched restaurants:", data);
+      console.log("Number of restaurants:", data.length);
+      
+      // Filter out restaurants with empty names
+      const validRestaurants = data.filter(r => r.name && r.name.trim() !== "");
+      console.log("Valid restaurants with names:", validRestaurants.length);
+      
+      setRestaurants(validRestaurants);
     } catch (err) {
+      console.error("Error fetching restaurants:", err);
       setError(err.message);
     }
   };
@@ -243,41 +270,119 @@ const InRestaurantOrder = () => {
       </div>
 
       <div className="map-section">
-        {userLocation && (
-          <MapContainer
-            center={userLocation}
-            zoom={15}
-            style={{ height: "100%", width: "100%" }}>
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <Marker position={userLocation} icon={redIcon}>
-              <Popup>You are here</Popup>
-              <Tooltip permanent direction="top">
-                Me
-              </Tooltip>
-            </Marker>
+        <div style={{ 
+          height: '500px', 
+          width: '100%', 
+          background: '#f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '18px',
+          fontWeight: 'bold'
+        }}>
+          {(() => {
+            try {
+              if (typeof L === 'undefined') {
+                return (
+                  <div style={{ textAlign: 'center', padding: '20px' }}>
+                    <div>Leaflet not loaded - Check console for errors</div>
+                    <div style={{ marginTop: '20px', fontSize: '14px' }}>
+                      <strong>Restaurant Locations (Text View):</strong><br/>
+                      {restaurants.map(r => (
+                        <div key={r._id} style={{ margin: '5px 0' }}>
+                          {r.name}: {r.lat.toFixed(4)}, {r.lon.toFixed(4)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              
+              return (
+                <MapContainer
+                  center={userLocation || [23.8103, 90.4125]}
+                  zoom={15}
+                  style={{ height: "100%", width: "100%" }}>
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  
+                  {userLocation && (
+                    <Marker position={userLocation} icon={defaultIcon}>
+                      <Popup>You are here</Popup>
+                      <Tooltip permanent direction="top">
+                        Me
+                      </Tooltip>
+                    </Marker>
+                  )}
 
-            {restaurants.map((r) => (
-              <Marker key={r._id} position={[r.lat, r.lon]}>
-                <Popup>
-                  <strong>{r.name}</strong>
-                  <br />
-                  {userLocation
-                    ? haversineDistance(
-                        userLocation[0],
-                        userLocation[1],
-                        r.lat,
-                        r.lon
-                      ).toFixed(2)
-                    : "N/A"}{" "}
-                  km away
-                </Popup>
-                <Tooltip direction="top" offset={[0, -10]} permanent>
-                  {r.name}
-                </Tooltip>
-              </Marker>
-            ))}
-          </MapContainer>
-        )}
+                  {restaurants.map((r) => {
+                    return (
+                      <Marker 
+                        key={r._id} 
+                        position={[r.lat, r.lon]} 
+                        icon={restaurantIcon}
+                        eventHandlers={{
+                          click: () => {
+                            console.log("Restaurant marker clicked:", r.name);
+                            handleSelect(r);
+                          }
+                        }}
+                      >
+                        <Popup>
+                          <div>
+                            <strong>{r.name}</strong>
+                            <br />
+                            {userLocation
+                              ? haversineDistance(
+                                  userLocation[0],
+                                  userLocation[1],
+                                  r.lat,
+                                  r.lon
+                                ).toFixed(2)
+                              : "N/A"}{" "}
+                            km away
+                            <br />
+                            <button 
+                              onClick={() => handleSelect(r)}
+                              style={{
+                                marginTop: '10px',
+                                padding: '5px 10px',
+                                backgroundColor: '#667eea',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              View Menu
+                            </button>
+                          </div>
+                        </Popup>
+                        <Tooltip direction="top" offset={[0, -10]} permanent>
+                          {r.name}
+                        </Tooltip>
+                      </Marker>
+                    );
+                  })}
+                </MapContainer>
+              );
+            } catch (error) {
+              console.error("Error rendering map:", error);
+              return (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <div>Map Error: {error.message}</div>
+                  <div style={{ marginTop: '20px', fontSize: '14px' }}>
+                    <strong>Restaurant Locations (Text View):</strong><br/>
+                    {restaurants.map(r => (
+                      <div key={r._id} style={{ margin: '5px 0' }}>
+                        {r.name}: {r.lat.toFixed(4)}, {r.lon.toFixed(4)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+          })()}
+        </div>
       </div>
 
       {selected && (

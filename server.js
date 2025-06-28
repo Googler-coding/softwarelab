@@ -6,7 +6,7 @@ import authRoutes from "./routes/auth.js";
 import jwt from "jsonwebtoken";
 import net from "net";
 import Restaurant from "./models/Restaurant.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import Admin from "./models/Admin.js";
 import Rider from "./models/Rider.js";
 import User from "./models/User.js";
