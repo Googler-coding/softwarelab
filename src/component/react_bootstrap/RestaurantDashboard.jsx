@@ -9,6 +9,7 @@ const RestaurantDashboard = () => {
   const [price, setPrice] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const token = localStorage.getItem("token");
@@ -22,7 +23,7 @@ const RestaurantDashboard = () => {
     }
     fetchMenuItems();
     fetchOrders();
-  }, []);
+  }, [token, userId, navigate]);
 
   const fetchMenuItems = async () => {
     try {
@@ -37,6 +38,8 @@ const RestaurantDashboard = () => {
       setMenuItems(data);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -105,16 +108,50 @@ const RestaurantDashboard = () => {
     }
   };
 
-  return (
-    <div className="container mt-5">
-      <h1 className="text-center mb-4">🍽️ Restaurant Dashboard</h1>
-      {error && <div className="alert alert-danger">{error}</div>}
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const res = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update order status");
+      fetchOrders();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
-      <div className="row">
+  if (loading) {
+    return (
+      <div className="restaurant-dashboard-container">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="restaurant-dashboard-container">
+      <div className="dashboard-header">
+        <h1>🍽️ Restaurant Dashboard</h1>
+        <p className="dashboard-subtitle">Manage your menu and track customer orders</p>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      <div className="dashboard-content">
         {/* Left: Menu Items */}
-        <div className="col-md-6 border-end pe-4">
-          <h3 className="mb-3">📋 Menu Items</h3>
-          <form onSubmit={handleSubmit} className="mb-4">
+        <div className="dashboard-section">
+          <div className="section-header">
+            <h3><span className="icon">📋</span> Menu Items</h3>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="menu-form">
             <input
               type="text"
               placeholder="Item name"
@@ -131,73 +168,120 @@ const RestaurantDashboard = () => {
               className="form-control mb-2"
               required
             />
-            <button type="submit" className="btn btn-success w-100">
+            <button type="submit" className="btn w-100">
               {editingId ? "Update Item" : "Add Item"}
             </button>
           </form>
 
-          {menuItems.length === 0 ? (
-            <p>No items found.</p>
-          ) : (
-            <ul className="list-group">
-              {menuItems.map((item) => (
-                <li
-                  key={item._id}
-                  className="list-group-item d-flex justify-content-between align-items-center">
-                  <span>
-                    {item.name} - ${item.price}
-                  </span>
-                  <div>
+          <div className="menu-list">
+            {menuItems.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">🍽️</div>
+                <div className="empty-state-text">No items found. Add your first menu item!</div>
+              </div>
+            ) : (
+              menuItems.map((item) => (
+                <div key={item._id} className="menu-item">
+                  <div className="menu-item-info">
+                    <div className="menu-item-name">{item.name}</div>
+                    <div className="menu-item-price">${item.price}</div>
+                  </div>
+                  <div className="menu-item-actions">
                     <button
-                      className="btn btn-sm btn-warning me-2"
+                      className="btn-edit"
                       onClick={() => handleEdit(item)}>
-                      ✏️
+                      ✏️ Edit
                     </button>
                     <button
-                      className="btn btn-sm btn-danger"
+                      className="btn-delete"
                       onClick={() => handleDelete(item._id)}>
-                      🗑️
+                      🗑️ Delete
                     </button>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {/* Right: Orders */}
-        <div className="col-md-6 ps-4">
-          <h3 className="mb-3">🧾 Customer Orders</h3>
-          {orders.length === 0 ? (
-            <p>No orders yet.</p>
-          ) : (
-            <ul className="list-group">
-              {orders.map((order) => (
-                <li
-                  key={order._id}
-                  className="list-group-item d-flex justify-content-between align-items-start">
-                  <div>
-                    <strong>{order.customerName || "Unnamed"}</strong>
-                    <br />
-                    Items:{" "}
-                    {order.items
-                      .map((i) => `${i.name} x${i.quantity}`)
-                      .join(", ")}
-                    <br />
-                    Total: ${order.total}
+        <div className="dashboard-section">
+          <div className="section-header">
+            <h3><span className="icon">🧾</span> Customer Orders</h3>
+          </div>
+          
+          <div className="orders-list">
+            {orders.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">📦</div>
+                <div className="empty-state-text">No orders yet. Orders will appear here when customers place them.</div>
+              </div>
+            ) : (
+              orders.map((order) => (
+                <div key={order._id} className="order-item">
+                  <div className="order-header">
+                    <div className="order-id">Order #{order._id.slice(-6)}</div>
+                    <span className={`order-status status-${order.status}`}>
+                      {order.status}
+                    </span>
                   </div>
-                  <span
-                    className={`badge rounded-pill ${
-                      order.status === "completed"
-                        ? "bg-success"
-                        : "bg-warning text-dark"
-                    }`}>
-                    {order.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+                  
+                  <div className="order-details">
+                    <div className="order-info">
+                      <div className="order-info-label">Customer</div>
+                      <div className="order-info-value">{order.customerName || "Unnamed"}</div>
+                    </div>
+                    <div className="order-info">
+                      <div className="order-info-label">Date</div>
+                      <div className="order-info-value">{new Date(order.createdAt).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="order-items">
+                    <div className="order-items-title">Items:</div>
+                    <ul className="order-item-list">
+                      {order.items.map((item, index) => (
+                        <li key={index}>
+                          <span className="order-item-name">{item.name}</span>
+                          <span className="order-item-details">
+                            x{item.quantity} - ${(item.price * item.quantity).toFixed(2)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="order-item-details" style={{ marginTop: '0.5rem', textAlign: 'right' }}>
+                      <strong>Total: ${order.total.toFixed(2)}</strong>
+                    </div>
+                  </div>
+                  
+                  {order.status === "pending" && (
+                    <div className="order-actions">
+                      <button
+                        className="btn-action btn-start-preparing"
+                        onClick={() => updateOrderStatus(order._id, "preparing")}>
+                        Start Preparing
+                      </button>
+                      <button
+                        className="btn-action btn-mark-complete"
+                        onClick={() => updateOrderStatus(order._id, "ready")}>
+                        Mark Ready
+                      </button>
+                    </div>
+                  )}
+                  
+                  {order.status === "preparing" && (
+                    <div className="order-actions">
+                      <button
+                        className="btn-action btn-mark-complete"
+                        onClick={() => updateOrderStatus(order._id, "ready")}>
+                        Mark Ready
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

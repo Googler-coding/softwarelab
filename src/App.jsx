@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -16,6 +15,7 @@ import InRestaurantOrder from "./component/react_bootstrap/InRestaurantOrder";
 import RiderDashboard from "./component/react_bootstrap/RiderDashboard";
 import RestaurantDashboard from "./component/react_bootstrap/RestaurantDashboard";
 import AdminDashboard from "./component/react_bootstrap/AdminDashboard";
+import UserOrderTracking from "./component/react_bootstrap/UserOrderTracking";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 
@@ -116,22 +116,49 @@ function App() {
     navigate("/");
   };
 
+  const handleLoginStateChange = (loggedIn) => {
+    setIsLoggedIn(loggedIn);
+  };
+
+  // Update login state when localStorage changes
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        if (decoded.exp * 1000 < Date.now()) {
+    const checkAuthStatus = () => {
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          const decoded = jwtDecode(token);
+          if (decoded.exp * 1000 < Date.now()) {
+            handleLogout();
+          } else {
+            setIsLoggedIn(true);
+          }
+        } catch (err) {
+          console.error("Token decode error:", err);
+          setError(`Token validation failed: ${err.message}`);
           handleLogout();
-        } else {
-          setIsLoggedIn(true);
         }
-      } catch (err) {
-        console.error("Token decode error:", err);
-        setError(`Token validation failed: ${err.message}`);
-        handleLogout();
+      } else {
+        setIsLoggedIn(false);
       }
-    }
+    };
+
+    // Check on mount
+    checkAuthStatus();
+
+    // Listen for storage changes (when user logs in/out in another component)
+    const handleStorageChange = () => {
+      checkAuthStatus();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically
+    const interval = setInterval(checkAuthStatus, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, [navigate]);
 
   if (error) {
@@ -150,7 +177,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+      <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} onLoginStateChange={handleLoginStateChange} />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/signin" element={<SignIn />} />
@@ -177,6 +204,14 @@ function App() {
           element={
             <ProtectedRoute allowedRole="admin">
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user-order-tracking"
+          element={
+            <ProtectedRoute allowedRole="user">
+              <UserOrderTracking />
             </ProtectedRoute>
           }
         />

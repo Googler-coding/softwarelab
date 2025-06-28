@@ -38,30 +38,19 @@ const InRestaurantOrder = () => {
   const [restaurants, setRestaurants] = useState([]);
   const [nearestRestaurants, setNearestRestaurants] = useState([]);
   const [error, setError] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const token = localStorage.getItem("token");
 
   useEffect(() => {
-    // Fetch restaurants from database
-    const fetchRestaurants = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/restaurants`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const data = await res.json();
-        if (!res.ok)
-          throw new Error(data.message || "Failed to fetch restaurants");
-        setRestaurants(data);
-      } catch (err) {
-        setError(err.message);
-      }
-    };
-
-    fetchRestaurants();
+    // Check if user is logged in
+    if (token) {
+      setIsLoggedIn(true);
+      fetchRestaurants();
+    } else {
+      setError("Please log in to view restaurants");
+    }
 
     // Get user location
     if (navigator.geolocation) {
@@ -71,12 +60,29 @@ const InRestaurantOrder = () => {
           setUserLocation(coords);
         },
         () => {
+          // Fallback to Dhaka coordinates
           const fallback = [23.8103, 90.4125];
           setUserLocation(fallback);
         }
       );
     }
   }, [token]);
+
+  const fetchRestaurants = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/restaurants`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to fetch restaurants");
+      setRestaurants(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   useEffect(() => {
     if (userLocation && restaurants.length > 0) {
@@ -100,7 +106,7 @@ const InRestaurantOrder = () => {
     if (!query.trim()) setSuggestions([]);
     else {
       const filtered = restaurants
-        .filter((r) => r.name.toLowerCase().includes(query.toLowerCase()))
+        .filter((r) => ((r.name || "").toLowerCase().includes(query.toLowerCase())))
         .slice(0, 5);
       setSuggestions(filtered);
     }
@@ -115,10 +121,10 @@ const InRestaurantOrder = () => {
 
   const handleAddToCart = (item) => {
     setCart((prev) => {
-      const exists = prev.find((i) => i.id === item.id);
+      const exists = prev.find((i) => i.id === item._id);
       return exists
-        ? prev.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i))
-        : [...prev, { ...item, qty: 1 }];
+        ? prev.map((i) => (i.id === item._id ? { ...i, qty: i.qty + 1 } : i))
+        : [...prev, { ...item, id: item._id, qty: 1 }];
     });
   };
 
@@ -143,9 +149,17 @@ const InRestaurantOrder = () => {
   const handlePlaceOrder = async () => {
     if (total === 0) return alert("Select at least one item.");
     try {
+      // Get user details from localStorage or use default
+      const userName = localStorage.getItem("userName") || "Customer";
+      const userEmail = localStorage.getItem("userEmail") || "customer@example.com";
+      const userPhone = localStorage.getItem("userPhone") || "Phone not provided";
+      
       const order = {
         restaurantId: selected._id,
-        customerName: "Customer", // Replace with actual user data if available
+        customerName: userName,
+        customerEmail: userEmail,
+        customerPhone: userPhone,
+        customerAddress: "Delivery Address", // This could be enhanced with real address input
         items: cart.map((item) => ({
           name: item.name,
           price: item.price,
@@ -153,7 +167,6 @@ const InRestaurantOrder = () => {
         })),
         total,
         status: "pending",
-        userId: selected.userId,
       };
 
       const res = await fetch(`${API_URL}/api/orders`, {
@@ -168,14 +181,26 @@ const InRestaurantOrder = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to place order");
 
-      alert(`Order placed! Total: $${total.toFixed(2)}`);
+      alert(`Order placed successfully! Order ID: #${data.order.orderId.slice(-6)}\nTotal: $${total.toFixed(2)}\nEstimated delivery: 30 minutes`);
       setCart([]);
+      setSelected(null);
     } catch (err) {
       setError(err.message);
     }
   };
 
   const total = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
+
+  if (!isLoggedIn) {
+    return (
+      <div className="inrestaurant-container">
+        <h2>In-Restaurant Order</h2>
+        <div className="error-message">
+          Please log in to view and order from restaurants.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="inrestaurant-container">
@@ -217,7 +242,7 @@ const InRestaurantOrder = () => {
         )}
       </div>
 
-      <div className="map-section" style={{ height: "400px", width: "100%" }}>
+      <div className="map-section">
         {userLocation && (
           <MapContainer
             center={userLocation}
@@ -273,45 +298,58 @@ const InRestaurantOrder = () => {
 
           <h4>Menu</h4>
           <div className="menu-list">
-            {selected.menu.map((item) => (
-              <div key={item._id} className="menu-item">
-                <span data-price={`$${item.price.toFixed(2)}`}>
-                  {item.name}
-                </span>
-                <button onClick={() => handleAddToCart(item)}>
-                  Add to Cart
-                </button>
-              </div>
-            ))}
+            {selected.menu && selected.menu.length > 0 ? (
+              selected.menu.map((item) => (
+                <div key={item._id} className="menu-item">
+                  <span data-price={`$${item.price.toFixed(2)}`}>
+                    {item.name}
+                  </span>
+                  <button onClick={() => handleAddToCart(item)}>
+                    Add to Cart
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="no-items">No menu items available</div>
+            )}
           </div>
 
           <div className="cart">
             <h4>Cart</h4>
             {cart.length === 0 ? (
-              <p className="no-items">No items selected.</p>
+              <div className="no-items">No items selected.</div>
             ) : (
-              <ul>
+              <>
                 {cart.map((item) => (
-                  <li key={item.id} className="cart-item">
-                    <span data-price={`$${(item.qty * item.price).toFixed(2)}`}>
-                      {item.name}
-                    </span>
-                    <div className="qty-controls">
-                      <button onClick={() => decrementQty(item.id)}>-</button>
-                      <span>{item.qty}</span>
-                      <button onClick={() => incrementQty(item.id)}>+</button>
+                  <div key={item.id} className="cart-item">
+                    <div className="cart-item-content">
+                      <span data-price={`$${(item.qty * item.price).toFixed(2)}`}>
+                        {item.name}
+                      </span>
                     </div>
-                    <button onClick={() => handleRemoveFromCart(item.id)}>
-                      Remove
-                    </button>
-                  </li>
+                    <div className="cart-item-controls">
+                      <div className="qty-controls">
+                        <button onClick={() => decrementQty(item.id)}>-</button>
+                        <span>{item.qty}</span>
+                        <button onClick={() => incrementQty(item.id)}>+</button>
+                      </div>
+                      <button onClick={() => handleRemoveFromCart(item.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+                <div className="cart-total">
+                  <h4>Total: ${total.toFixed(2)}</h4>
+                </div>
+                <button 
+                  className="place-order-btn" 
+                  onClick={handlePlaceOrder}
+                  disabled={total === 0}>
+                  Place Order
+                </button>
+              </>
             )}
-            <h4 style={{ textAlign: "center" }}>Total: ${total.toFixed(2)}</h4>
-            <button className="place-order-btn" onClick={handlePlaceOrder}>
-              Place Order
-            </button>
           </div>
         </div>
       )}
