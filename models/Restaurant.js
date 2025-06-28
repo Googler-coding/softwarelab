@@ -1,11 +1,10 @@
 import mongoose from "mongoose";
 
 const restaurantSchema = new mongoose.Schema({
-  restaurantName: { type: String, required: true, minlength: 2 },
-  ownerName: { type: String, required: true, minlength: 2 },
+  restaurantName: { type: String, required: true },
+  ownerName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true, minlength: 6 },
-}, { timestamps: true });
+  password: { type: String, required: true },
+});
 
-const Restaurant = mongoose.model('Restaurant', restaurantSchema);
-export default Restaurant;
+export default mongoose.model("Restaurant", restaurantSchema);

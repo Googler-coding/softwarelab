@@ -1,5 +1,7 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+// src/App.jsx
+import React, { useState, useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 import Header from "./component/Header";
 import Middlepart1 from "./component/middlepart1";
 import Middlepart2 from "./component/react_bootstrap/Middlepart2";
@@ -14,9 +16,44 @@ import InRestaurantOrder from "./component/react_bootstrap/InRestaurantOrder";
 import RiderDashboard from "./component/react_bootstrap/RiderDashboard";
 import RestaurantDashboard from "./component/react_bootstrap/RestaurantDashboard";
 import AdminDashboard from "./component/react_bootstrap/AdminDashboard";
-
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
+
+class ErrorBoundary extends React.Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught error:", { error, errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="container">
+          <div className="error-message">
+            <h2>Something went wrong</h2>
+            <p>
+              {this.state.error?.message || "An unexpected error occurred."}
+            </p>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                window.location.href = "/";
+              }}
+              className="submit-button">
+              Reset and Go Home
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const HomePage = () => (
   <>
@@ -40,32 +77,112 @@ const HomePage = () => (
         <Deliverto />
       </div>
     </div>
-
     <div id="div_footer">
       <Footer />
     </div>
   </>
 );
 
+const ProtectedRoute = ({ children, allowedRole }) => {
+  const token = localStorage.getItem("token");
+  const role = localStorage.getItem("role");
+
+  if (!token || !role) {
+    return <Navigate to="/" replace />;
+  }
+
+  try {
+    const decoded = jwtDecode(token);
+    if (decoded.role !== allowedRole) {
+      return <Navigate to="/" replace />;
+    }
+    return children;
+  } catch (err) {
+    console.error("Token decode error:", err);
+    localStorage.clear();
+    return <Navigate to="/" replace />;
+  }
+};
+
 function App() {
-  return (
-    <Router>
-      <div className="app-container">
-        <Header />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/in-restaurant-order" element={<InRestaurantOrder />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/rider-dashboard" element={<RiderDashboard />} />
-          <Route
-            path="/restaurant-dashboard"
-            element={<RestaurantDashboard />}
-          />
-          <Route path="/admin-dashboard" element={<AdminDashboard />} />
-        </Routes>
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.clear();
+    setIsLoggedIn(false);
+    setError(null);
+    navigate("/");
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        if (decoded.exp * 1000 < Date.now()) {
+          handleLogout();
+        } else {
+          setIsLoggedIn(true);
+        }
+      } catch (err) {
+        console.error("Token decode error:", err);
+        setError(`Token validation failed: ${err.message}`);
+        handleLogout();
+      }
+    }
+  }, [navigate]);
+
+  if (error) {
+    return (
+      <div className="container">
+        <div className="error-message">
+          <h2>Application Error</h2>
+          <p>{error}</p>
+          <button onClick={handleLogout} className="submit-button">
+            Reset and Go Home
+          </button>
+        </div>
       </div>
-    </Router>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/in-restaurant-order" element={<InRestaurantOrder />} />
+        <Route
+          path="/restaurant-dashboard"
+          element={
+            <ProtectedRoute allowedRole="restaurant">
+              <RestaurantDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rider-dashboard"
+          element={
+            <ProtectedRoute allowedRole="rider">
+              <RiderDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-dashboard"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }
 
