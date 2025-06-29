@@ -50,9 +50,7 @@ const FoodDonation = () => {
 
   const fetchCharities = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/donations/charities/available`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_URL}/api/charities/public/available`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch charities");
       setCharities(data);

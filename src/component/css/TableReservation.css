@@ -631,4 +631,43 @@
 
 .table-item.selected {
   animation: tableSelect 0.3s ease;
+}
+
+/* Confirmation Message Styles */
+.confirmation-message {
+  margin-top: 20px;
+}
+
+.confirmation-message .alert {
+  border-radius: 12px;
+  border: none;
+  padding: 20px;
+  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.2);
+}
+
+.confirmation-message .alert-success {
+  background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+  color: white;
+}
+
+.confirmation-message .alert-heading {
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+.reservation-details {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.reservation-details p {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.reservation-details strong {
+  color: #fff;
+  font-weight: 600;
 } 

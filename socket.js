@@ -42,6 +42,8 @@ const initializeSocket = (server) => {
     socket.on("orderStatusUpdate", (data) => {
       const { orderId, status, kitchenStatus, restaurantId, userId, riderId } = data;
       
+      console.log('Order status update received:', data);
+      
       // Emit to all relevant parties
       io.emit("orderUpdate", {
         orderId,
@@ -53,9 +55,20 @@ const initializeSocket = (server) => {
         timestamp: new Date(),
       });
 
+      // Emit specific orderStatusUpdate event for immediate UI updates
+      io.emit("orderStatusUpdate", {
+        orderId,
+        status,
+        kitchenStatus,
+        restaurantId,
+        userId,
+        riderId,
+        timestamp: new Date(),
+      });
+
       // Emit to specific rooms
       if (userId) {
-        io.to(`user_${userId}`).emit("orderUpdate", {
+        io.to(`user_${userId}`).emit("orderStatusUpdate", {
           orderId,
           status,
           kitchenStatus,
@@ -67,7 +80,7 @@ const initializeSocket = (server) => {
       }
 
       if (restaurantId) {
-        io.to(`restaurant_${restaurantId}`).emit("orderUpdate", {
+        io.to(`restaurant_${restaurantId}`).emit("orderStatusUpdate", {
           orderId,
           status,
           kitchenStatus,
@@ -79,7 +92,7 @@ const initializeSocket = (server) => {
       }
 
       if (riderId) {
-        io.to(`rider_${riderId}`).emit("orderUpdate", {
+        io.to(`rider_${riderId}`).emit("orderStatusUpdate", {
           orderId,
           status,
           kitchenStatus,
@@ -91,7 +104,7 @@ const initializeSocket = (server) => {
       }
 
       // Emit to admin room
-      io.to("admin").emit("orderUpdate", {
+      io.to("admin").emit("orderStatusUpdate", {
         orderId,
         status,
         kitchenStatus,
@@ -198,10 +211,9 @@ const initializeSocket = (server) => {
     // Join order room for chat
     socket.on("joinOrderChat", (orderId) => {
       socket.join(`order_${orderId}`);
-      console.log(`Client joined order chat: ${orderId}`);
+      console.log(`Socket ${socket.id} joined order chat room: ${orderId}`);
     });
 
-    // Handle disconnection
     socket.on("disconnect", () => {
       console.log("Client disconnected:", socket.id);
     });

@@ -13,7 +13,7 @@ import InRestaurantOrder from "./component/react_bootstrap/InRestaurantOrder";
 import RiderDashboard from "./component/react_bootstrap/RiderDashboard";
 import RestaurantDashboard from "./component/react_bootstrap/RestaurantDashboard";
 import AdminDashboard from "./component/react_bootstrap/AdminDashboard";
-import UserOrderTracking from "./component/react_bootstrap/UserOrderTracking";
+import UserDashboard from "./component/react_bootstrap/UserDashboard";
 import FoodDonation from "./component/react_bootstrap/FoodDonation";
 import Subscription from "./component/react_bootstrap/Subscription";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -208,10 +208,10 @@ function App() {
           }
         />
         <Route
-          path="/user-order-tracking"
+          path="/dashboard"
           element={
             <ProtectedRoute allowedRole="user">
-              <UserOrderTracking />
+              <UserDashboard />
             </ProtectedRoute>
           }
         />

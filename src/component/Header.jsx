@@ -556,7 +556,7 @@ const Header = ({ isLoggedIn, onLogout, onLoginStateChange }) => {
           {currentRole === "admin" && "Admin Dashboard"}
           {currentRole === "restaurant" && "Restaurant Dashboard"}
           {currentRole === "rider" && "Rider Dashboard"}
-          {currentRole === "user" && "User Dashboard"}
+          {currentRole === "user" && "My Dashboard"}
         </span>
       </div>
       <div className="navbar-right">
@@ -585,15 +585,19 @@ const Header = ({ isLoggedIn, onLogout, onLoginStateChange }) => {
         <Link to="/customize">Meal Customize</Link>
         <Link to="/in-restaurant-order">In-Restaurant Order</Link>
         <Link to="/donate">Food Donation</Link>
-        {isLoggedIn && currentRole === "user" && (
-          <Link to="/user-order-tracking">My Orders</Link>
-        )}
       </div>
       <div className="navbar-right">
         {isLoggedIn ? (
-          <button onClick={handleLogoutClick} className="auth-button">
-            Sign Out
-          </button>
+          <>
+            {currentRole === "user" && (
+              <Link to="/dashboard" className="auth-button dashboard-link">
+                Dashboard
+              </Link>
+            )}
+            <button onClick={handleLogoutClick} className="auth-button">
+              Sign Out
+            </button>
+          </>
         ) : (
           <button onClick={() => setShowSignIn(true)} className="auth-button">
             Sign In

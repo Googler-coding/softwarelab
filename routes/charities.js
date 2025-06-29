@@ -207,6 +207,24 @@ router.get("/profile", auth, async (req, res) => {
   }
 });
 
+// Public endpoint to get available charities (no authentication required)
+router.get("/public/available", async (req, res) => {
+  try {
+    const charities = await Charity.find({ 
+      status: 'active', 
+      verified: true 
+    }).select('-password -documents');
+    
+    res.json(charities);
+  } catch (error) {
+    console.error("Error fetching available charities:", error);
+    res.status(500).json({ 
+      message: "Failed to fetch charities", 
+      error: error.message 
+    });
+  }
+});
+
 // Update charity profile
 router.patch("/profile", auth, async (req, res) => {
   try {

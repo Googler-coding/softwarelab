@@ -329,6 +329,45 @@ router.patch("/:reservationId/cancel", auth, async (req, res) => {
   }
 });
 
+// Request cancellation of reservation
+router.patch("/:reservationId/cancel-request", auth, async (req, res) => {
+  try {
+    const { status, cancellationReason } = req.body;
+    const reservation = await TableReservation.findById(req.params.reservationId);
+
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Verify user has access (only the customer who made the reservation can request cancellation)
+    if (reservation.userId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Only allow cancellation request for pending or confirmed reservations
+    if (!['pending', 'confirmed'].includes(reservation.status)) {
+      return res.status(400).json({ 
+        message: "Cannot request cancellation for this reservation status" 
+      });
+    }
+
+    // Update reservation status to cancel_requested
+    reservation.status = 'cancel_requested';
+    reservation.cancellationReason = cancellationReason || 'Customer requested cancellation';
+    reservation.updatedAt = new Date();
+
+    await reservation.save();
+
+    res.json({ 
+      message: "Cancellation request sent successfully", 
+      reservation 
+    });
+  } catch (error) {
+    console.error("Error requesting cancellation:", error);
+    res.status(500).json({ message: "Failed to request cancellation" });
+  }
+});
+
 // Get restaurant's table configuration
 router.get("/restaurant/:restaurantId/tables", auth, async (req, res) => {
   try {

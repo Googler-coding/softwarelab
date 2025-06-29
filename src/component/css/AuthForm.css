@@ -13,7 +13,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 99999 !important;
   animation: fadeIn 0.3s ease;
 }
 
@@ -34,6 +34,7 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: slideUp 0.4s ease;
   overflow: hidden;
+  z-index: 100000 !important;
 }
 
 @keyframes slideUp {
@@ -412,5 +413,45 @@
     height: 32px;
     font-size: 1rem;
   }
+}
+
+/* Ensure modal appears above all elements including maps */
+.popup-overlay,
+.popup-overlay * {
+  z-index: 99999 !important;
+}
+
+/* Override any map or other high z-index elements */
+.popup-overlay {
+  position: fixed !important;
+  z-index: 99999 !important;
+}
+
+.popup {
+  z-index: 100000 !important;
+  position: relative !important;
+}
+
+/* Ensure no other elements can appear above the modal */
+body:has(.popup-overlay) .popup-overlay {
+  z-index: 99999 !important;
+}
+
+/* Additional specificity for map containers */
+.popup-overlay,
+.popup-overlay .popup {
+  z-index: 99999 !important;
+}
+
+/* Override any Leaflet map z-index */
+.leaflet-container,
+.leaflet-pane,
+.leaflet-control-container {
+  z-index: 1 !important;
+}
+
+/* When modal is open, ensure it's above everything */
+.popup-overlay:not([style*="display: none"]) {
+  z-index: 99999 !important;
 }
   

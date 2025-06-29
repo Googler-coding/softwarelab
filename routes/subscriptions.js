@@ -10,6 +10,85 @@ import { io } from "../socket.js";
 
 const router = express.Router();
 
+// Public endpoint to get available subscription plans (no authentication required)
+router.get("/public/plans", async (req, res) => {
+  try {
+    const plans = [
+      {
+        name: "Basic Plan",
+        description: "Perfect for individual users",
+        price: 299,
+        currency: "BDT",
+        features: [
+          "Free delivery on orders above ৳500",
+          "Priority customer support",
+          "Access to exclusive deals",
+          "Order tracking"
+        ],
+        planTypes: [
+          { type: "weekly", price: 99 },
+          { type: "monthly", price: 299 },
+          { type: "quarterly", price: 799 },
+          { type: "yearly", price: 2999 }
+        ]
+      },
+      {
+        name: "Premium Plan",
+        description: "Best value for regular users",
+        price: 599,
+        currency: "BDT",
+        features: [
+          "Free delivery on all orders",
+          "Priority customer support",
+          "Access to exclusive deals",
+          "Order tracking",
+          "Free table reservations",
+          "Special member discounts",
+          "Early access to new features"
+        ],
+        planTypes: [
+          { type: "weekly", price: 199 },
+          { type: "monthly", price: 599 },
+          { type: "quarterly", price: 1599 },
+          { type: "yearly", price: 5999 }
+        ]
+      },
+      {
+        name: "Family Plan",
+        description: "Great for families and groups",
+        price: 999,
+        currency: "BDT",
+        features: [
+          "Free delivery on all orders",
+          "Priority customer support",
+          "Access to exclusive deals",
+          "Order tracking",
+          "Free table reservations",
+          "Special member discounts",
+          "Early access to new features",
+          "Family meal packages",
+          "Bulk order discounts",
+          "Personal meal planner"
+        ],
+        planTypes: [
+          { type: "weekly", price: 299 },
+          { type: "monthly", price: 999 },
+          { type: "quarterly", price: 2699 },
+          { type: "yearly", price: 9999 }
+        ]
+      }
+    ];
+    
+    res.json(plans);
+  } catch (error) {
+    console.error("Error fetching subscription plans:", error);
+    res.status(500).json({ 
+      message: "Failed to fetch plans", 
+      error: error.message 
+    });
+  }
+});
+
 // Create a new subscription
 router.post("/", auth, async (req, res) => {
   try {

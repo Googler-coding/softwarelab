@@ -267,7 +267,7 @@ function InRestaurantOrder() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to place order");
 
-      alert("Order placed successfully! You can track it in 'My Orders'.");
+      alert("Order placed successfully! You can track it in your Dashboard.");
       setCart([]);
       setSelected(null);
     } catch (err) {

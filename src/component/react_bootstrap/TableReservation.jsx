@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Row, Col, Button, Alert, Modal, Badge, Spinner } from 'react-bootstrap';
+import { Card, Form, Row, Col, Button, Alert, Badge, Spinner } from 'react-bootstrap';
 import '../css/TableReservation.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -112,17 +112,13 @@ const TableReservation = ({ restaurantId, onReservationComplete }) => {
         guests: formData.guests
       });
 
-      const response = await fetch(`${API_URL}/api/reservations/availability`, {
-        method: 'POST',
+      // Use the correct endpoint for availability check
+      const response = await fetch(`${API_URL}/api/reservations/available/${restaurantId}?date=${formData.date}&time=${formData.time}&numberOfGuests=${formData.guests}`, {
+        method: "GET",
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({
-          restaurantId,
-          reservationDate: formData.date,
-          reservationTime: formData.time,
-          numberOfGuests: parseInt(formData.guests)
-        }),
       });
 
       if (!response.ok) {
@@ -130,29 +126,32 @@ const TableReservation = ({ restaurantId, onReservationComplete }) => {
         throw new Error(errorData.message || 'Failed to check availability');
       }
 
-      const availableTables = await response.json();
-      console.log('Available tables:', availableTables);
+      const availabilityData = await response.json();
+      console.log('Availability data:', availabilityData);
       
-      // Update tables with availability status
-      const updatedTables = tables.map(table => ({
-        ...table,
-        isAvailable: availableTables.some(availableTable => 
-          availableTable.tableNumber === table.tableNumber && 
-          availableTable.capacity >= parseInt(formData.guests)
-        ),
-        isBooked: !availableTables.some(availableTable => 
-          availableTable.tableNumber === table.tableNumber && 
-          availableTable.capacity >= parseInt(formData.guests)
-        )
-      }));
+      // Update tables with availability status from the server response
+      const updatedTables = tables.map(table => {
+        const isAvailable = availabilityData.availableTables.some(availableTable => 
+          availableTable.tableNumber === table.tableNumber
+        );
+        const isBooked = availabilityData.bookedTables.some(bookedTable => 
+          bookedTable.tableNumber === table.tableNumber
+        );
+        
+        return {
+          ...table,
+          isAvailable: isAvailable && table.capacity >= parseInt(formData.guests),
+          isBooked: isBooked || table.capacity < parseInt(formData.guests)
+        };
+      });
       
       setTables(updatedTables);
       setAvailabilityChecked(true);
       setSelectedTable(null); // Reset selection
       
       // Show success message if tables are available
-      if (availableTables.length > 0) {
-        setSuccess(`Found ${availableTables.length} available table(s) for your party!`);
+      if (availabilityData.availableTables.length > 0) {
+        setSuccess(`Found ${availabilityData.availableTables.length} available table(s) for your party!`);
         setTimeout(() => setSuccess(null), 3000);
       } else {
         setError('No tables available for the selected time and party size. Please try a different time or date.');
@@ -337,7 +336,8 @@ const TableReservation = ({ restaurantId, onReservationComplete }) => {
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
 
-    for (let hour = 12; hour <= 22; hour++) {
+    // Generate time slots from 10 AM to 11 PM (10:00 to 23:00)
+    for (let hour = 10; hour <= 23; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
         const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         
@@ -351,9 +351,21 @@ const TableReservation = ({ restaurantId, onReservationComplete }) => {
         
         const isDisabled = isPastTime || isTooClose;
         
+        // Format display time (12-hour format)
+        let displayHour = hour;
+        let ampm = 'AM';
+        if (hour > 12) {
+          displayHour = hour - 12;
+          ampm = 'PM';
+        } else if (hour === 12) {
+          ampm = 'PM';
+        } else if (hour === 0) {
+          displayHour = 12;
+        }
+        
         slots.push({
           value: timeString,
-          label: `${hour > 12 ? hour - 12 : hour}:${minute.toString().padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`,
+          label: `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`,
           disabled: isDisabled,
           reason: isPastTime ? 'Past time' : isTooClose ? 'Too close to current time' : null
         });
@@ -500,7 +512,7 @@ const TableReservation = ({ restaurantId, onReservationComplete }) => {
             {availabilityChecked && (
               <div className="table-selection-section">
                 <h5 className="mt-4">🪑 Select Your Table</h5>
-                {tables.filter(table => table.capacity >= parseInt(formData.guests)).length === 0 ? (
+                {tables.filter(table => table.capacity >= parseInt(formData.guests) && table.isAvailable).length === 0 ? (
                   <Alert variant="warning">
                     No tables available for {formData.guests} guests at {formData.time} on {formData.date}
                   </Alert>
@@ -514,11 +526,11 @@ const TableReservation = ({ restaurantId, onReservationComplete }) => {
                           className={`table-item ${table.isBooked ? 'booked' : 'available'} ${selectedTable?._id === table._id ? 'selected' : ''}`}
                           onClick={() => handleTableSelect(table)}
                         >
-                          <div className="table-code">{table.tableCode}</div>
+                          <div className="table-code">{table.tableCode || `T${table.tableNumber}`}</div>
                           <div className="table-info">
-                            <div className="table-name">{table.tableName}</div>
+                            <div className="table-name">{table.tableName || `Table ${table.tableNumber}`}</div>
                             <div className="table-capacity">👥 {table.capacity}</div>
-                            <div className="table-location">📍 {table.location}</div>
+                            <div className="table-location">📍 {table.location || 'Standard'}</div>
                           </div>
                           <div className="table-status">
                             {table.isBooked ? (
@@ -556,28 +568,26 @@ const TableReservation = ({ restaurantId, onReservationComplete }) => {
         </Card.Body>
       </Card>
 
-      {/* Confirmation Modal */}
-      <Modal show={showConfirmation} onHide={handleClose} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>🎉 Reservation Confirmed!</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>Your table reservation has been successfully created.</p>
-          <div className="reservation-details">
-            <p><strong>Table:</strong> {selectedTable?.tableCode} ({selectedTable?.tableName})</p>
-            <p><strong>Date:</strong> {formData.date}</p>
-            <p><strong>Time:</strong> {formData.time}</p>
-            <p><strong>Guests:</strong> {formData.guests}</p>
-            <p><strong>Customer:</strong> {formData.customerName}</p>
-            <p><strong>Contact:</strong> {formData.customerEmail} | {formData.customerPhone}</p>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="primary" onClick={handleClose}>
-            OK
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Confirmation Message */}
+      {showConfirmation && (
+        <div className="confirmation-message mt-4">
+          <Alert variant="success">
+            <Alert.Heading>🎉 Reservation Confirmed!</Alert.Heading>
+            <p>Your table reservation has been successfully created.</p>
+            <div className="reservation-details">
+              <p><strong>Table:</strong> {selectedTable?.tableCode} ({selectedTable?.tableName})</p>
+              <p><strong>Date:</strong> {formData.date}</p>
+              <p><strong>Time:</strong> {formData.time}</p>
+              <p><strong>Guests:</strong> {formData.guests}</p>
+              <p><strong>Customer:</strong> {formData.customerName}</p>
+              <p><strong>Contact:</strong> {formData.customerEmail} | {formData.customerPhone}</p>
+            </div>
+            <Button variant="primary" onClick={handleClose} className="mt-3">
+              OK
+            </Button>
+          </Alert>
+        </div>
+      )}
     </div>
   );
 };

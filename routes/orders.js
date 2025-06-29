@@ -237,12 +237,24 @@ router.put("/restaurant/:orderId/status", auth, async (req, res) => {
     console.log(`Order ${orderId} status updated to: ${status}`);
 
     // Emit real-time update
-    io.emit("orderUpdate", {
-      orderId: order.orderId,
-      status: order.status,
-      restaurantId: order.restaurantId,
-      userId: order.userId,
-    });
+    const io = req.app.get('io');
+    if (io) {
+      io.emit("orderUpdate", {
+        orderId: order.orderId,
+        status: order.status,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+      });
+
+      // Emit specific orderStatusUpdate event
+      io.emit("orderStatusUpdate", {
+        orderId: order._id,
+        status: order.status,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+        timestamp: new Date(),
+      });
+    }
 
     res.json({ 
       message: "Order status updated successfully", 
@@ -290,13 +302,26 @@ router.patch("/:orderId/status", auth, async (req, res) => {
     await order.save();
 
     // Emit real-time update
-    io.emit("orderUpdate", {
-      orderId: order.orderId,
-      status: order.status,
-      kitchenStatus: order.kitchenStatus,
-      restaurantId: order.restaurantId,
-      userId: order.userId,
-    });
+    const io = req.app.get('io');
+    if (io) {
+      io.emit("orderUpdate", {
+        orderId: order.orderId,
+        status: order.status,
+        kitchenStatus: order.kitchenStatus,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+      });
+
+      // Emit specific orderStatusUpdate event
+      io.emit("orderStatusUpdate", {
+        orderId: order._id,
+        status: order.status,
+        kitchenStatus: order.kitchenStatus,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+        timestamp: new Date(),
+      });
+    }
 
     res.json({ message: "Order status updated", order });
   } catch (error) {

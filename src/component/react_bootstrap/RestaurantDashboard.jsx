@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, Form, Alert, Spinner, Badge, Modal } from "react-bootstrap";
 import "../css/RestaurantDashboard.css";
+import { io } from 'socket.io-client';
 
 const RestaurantDashboard = () => {
   const [menuItems, setMenuItems] = useState([]);
@@ -9,6 +10,7 @@ const RestaurantDashboard = () => {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [socket, setSocket] = useState(null);
 
   // Menu Management States
   const [name, setName] = useState("");
@@ -28,15 +30,44 @@ const RestaurantDashboard = () => {
   const token = localStorage.getItem("token");
 
   useEffect(() => {
+    if (!token) {
+      window.location.href = "/signin";
+      return;
+    }
+
+    initializeSocket();
     fetchAllData();
     
-    // Auto-refresh reservations every 30 seconds
-    const interval = setInterval(() => {
-      fetchReservations();
-    }, 30000);
-    
+    // Set up periodic refresh for orders
+    const interval = setInterval(fetchOrders, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [token]);
+
+  const initializeSocket = () => {
+    const newSocket = io(API_URL);
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log('Restaurant dashboard connected to server');
+      newSocket.emit('joinRestaurant', localStorage.getItem('id'));
+    });
+
+    newSocket.on('orderUpdate', (data) => {
+      console.log('Order update received in restaurant dashboard:', data);
+      fetchOrders(); // Refresh orders list
+    });
+
+    newSocket.on('reservationUpdate', (data) => {
+      console.log('Reservation update received:', data);
+      fetchReservations(); // Refresh reservations list
+    });
+
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  };
 
   const fetchAllData = async () => {
     try {
@@ -136,13 +167,24 @@ const RestaurantDashboard = () => {
   const handleTableSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Validate required fields
+      if (!tableName.trim()) {
+        setError('Table name is required');
+        return;
+      }
+      
+      if (tableAvailableDate && !tableAvailableTime) {
+        setError('Please select a time when setting an available date');
+        return;
+      }
+
       const tableData = {
         tableName,
         capacity: parseInt(tableCapacity),
         location: tableLocation,
         isAvailable: true,
-        availableDate: tableAvailableDate,
-        availableTime: tableAvailableTime,
+        availableDate: tableAvailableDate || null,
+        availableTime: tableAvailableTime || null,
       };
 
       const url = editingTableId 
@@ -170,6 +212,7 @@ const RestaurantDashboard = () => {
       setTableAvailableTime("");
       setEditingTableId(null);
       setShowTableModal(false);
+      setError(null);
       fetchTables();
     } catch (err) {
       setError(err.message);
@@ -236,11 +279,29 @@ const RestaurantDashboard = () => {
       const result = await res.json();
       console.log("Order status updated successfully:", result);
       
-      // Refresh orders list
+      // Emit socket event for real-time update
+      if (socket) {
+        socket.emit('orderStatusUpdate', {
+          orderId: result.order._id,
+          status: newStatus,
+          restaurantId: result.order.restaurantId,
+          userId: result.order.userId
+        });
+      }
+      
+      // Refresh orders list immediately
       await fetchOrders();
       
       // Show success message
       setError(null);
+      
+      // Show temporary success message
+      const successMessage = `Order status updated to ${newStatus}`;
+      setError(null);
+      setTimeout(() => {
+        // Clear any success message after 3 seconds
+      }, 3000);
+      
     } catch (err) {
       console.error("Error updating order status:", err);
       setError(`Failed to update order status: ${err.message}`);
@@ -283,11 +344,10 @@ const RestaurantDashboard = () => {
   const getStatusColor = (status) => {
     const colors = {
       'pending': 'warning',
-      'confirmed': 'info',
-      'preparing': 'primary',
-      'ready': 'success',
-      'delivered': 'success',
-      'cancelled': 'danger'
+      'confirmed': 'success',
+      'completed': 'info',
+      'cancelled': 'danger',
+      'cancel_requested': 'info'
     };
     return colors[status] || 'secondary';
   };
@@ -302,6 +362,45 @@ const RestaurantDashboard = () => {
       'cancelled': '❌'
     };
     return icons[status] || '❓';
+  };
+
+  // Generate time slots for table availability
+  const generateTimeSlots = () => {
+    const slots = [];
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Generate time slots from 10 AM to 11 PM (10:00 to 23:00)
+    for (let hour = 10; hour <= 23; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const isToday = tableAvailableDate === today;
+        const isPastTime = isToday && (hour < currentHour || (hour === currentHour && minute <= currentMinute));
+        
+        // Format display time (12-hour format)
+        let displayHour = hour;
+        let ampm = 'AM';
+        if (hour > 12) {
+          displayHour = hour - 12;
+          ampm = 'PM';
+        } else if (hour === 12) {
+          ampm = 'PM';
+        } else if (hour === 0) {
+          displayHour = 12;
+        }
+        
+        slots.push({
+          value: timeString,
+          label: `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`,
+          disabled: isPastTime,
+          reason: isPastTime ? 'Past time' : null
+        });
+      }
+    }
+    
+    return slots;
   };
 
   if (loading) {
@@ -437,6 +536,9 @@ const RestaurantDashboard = () => {
                       <h6>{table.tableName}</h6>
                       <p>Capacity: {table.capacity} seats</p>
                       <p>Location: {table.location}</p>
+                      {table.availableDate && (
+                        <p>Available: {new Date(table.availableDate).toLocaleDateString()} at {table.availableTime}</p>
+                      )}
                       <Badge bg={table.isAvailable ? "success" : "danger"}>
                         {table.isAvailable ? "Available" : "Occupied"}
                       </Badge>
@@ -572,13 +674,22 @@ const RestaurantDashboard = () => {
                     </div>
                     <div className="reservation-actions">
                       {reservation.status === "pending" && (
-                        <Button 
-                          size="sm" 
-                          variant="success"
-                          onClick={() => updateReservationStatus(reservation._id, "confirmed")}
-                        >
-                          Confirm
-                        </Button>
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="success"
+                            onClick={() => updateReservationStatus(reservation._id, "confirmed")}
+                          >
+                            Confirm
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="danger"
+                            onClick={() => updateReservationStatus(reservation._id, "cancelled")}
+                          >
+                            Cancel
+                          </Button>
+                        </>
                       )}
                       {reservation.status === "confirmed" && (
                         <Button 
@@ -589,14 +700,23 @@ const RestaurantDashboard = () => {
                           Complete
                         </Button>
                       )}
-                      {reservation.status === "pending" && (
-                        <Button 
-                          size="sm" 
-                          variant="danger"
-                          onClick={() => updateReservationStatus(reservation._id, "cancelled")}
-                        >
-                          Cancel
-                        </Button>
+                      {reservation.status === "cancel_requested" && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="success"
+                            onClick={() => updateReservationStatus(reservation._id, "cancelled")}
+                          >
+                            Approve Cancellation
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="warning"
+                            onClick={() => updateReservationStatus(reservation._id, "confirmed")}
+                          >
+                            Deny & Keep Reservation
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -613,7 +733,16 @@ const RestaurantDashboard = () => {
       </div>
 
       {/* Table Modal */}
-      <Modal show={showTableModal} onHide={() => setShowTableModal(false)}>
+      <Modal show={showTableModal} onHide={() => {
+        setShowTableModal(false);
+        setTableName("");
+        setTableCapacity(2);
+        setTableLocation("Indoor");
+        setTableAvailableDate("");
+        setTableAvailableTime("");
+        setEditingTableId(null);
+        setError(null);
+      }}>
         <Modal.Header closeButton>
           <Modal.Title>
             {editingTableId ? "Edit Table" : "Add New Table"}
@@ -674,6 +803,7 @@ const RestaurantDashboard = () => {
                   }
                   
                   setTableAvailableDate(selectedDate);
+                  setTableAvailableTime(''); // Reset time when date changes
                   setError(null);
                 }}
                 min={new Date().toISOString().split('T')[0]}
@@ -681,26 +811,22 @@ const RestaurantDashboard = () => {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Available Time</Form.Label>
-              <Form.Control
-                type="time"
+              <Form.Select
                 value={tableAvailableTime}
                 onChange={(e) => {
                   const selectedTime = e.target.value;
-                  const now = new Date();
-                  const currentTime = now.toLocaleTimeString('en-CA', { hour12: false }).slice(0, 5);
-                  
-                  // If date is today, prevent past times
-                  if (tableAvailableDate === now.toISOString().split('T')[0] && selectedTime <= currentTime) {
-                    setError('Cannot select past times for today');
-                    return;
-                  }
-                  
                   setTableAvailableTime(selectedTime);
                   setError(null);
                 }}
-                min={tableAvailableDate === new Date().toISOString().split('T')[0] ? 
-                  new Date().toLocaleTimeString('en-CA', { hour12: false }).slice(0, 5) : undefined}
-              />
+                required
+              >
+                <option value="">Select time</option>
+                {generateTimeSlots().map((slot) => (
+                  <option key={slot.value} value={slot.value} disabled={slot.disabled}>
+                    {slot.label} {slot.reason && `(${slot.reason})`}
+                  </option>
+                ))}
+              </Form.Select>
             </Form.Group>
             <div className="d-flex gap-2">
               <Button type="submit" variant="primary">

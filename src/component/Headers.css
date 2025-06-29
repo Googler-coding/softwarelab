@@ -70,6 +70,19 @@
     background-color: darkred;
   }
   
+  .dashboard-link {
+    background-color: #667eea !important;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .dashboard-link:hover {
+    background-color: #5a6fd8 !important;
+    letter-spacing: 0.5px;
+  }
+  
   /* Popup Overlay */
   .popup-overlay {
     position: fixed;

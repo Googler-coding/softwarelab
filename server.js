@@ -243,12 +243,14 @@ app.use("/api/reservations", authMiddleware, reservationRoutes);
 app.use("/api/riders", authMiddleware, riderRoutes);
 app.use("/api/chat", chatRoutes);
 
-// New feature routes
+// Public routes (no authentication required)
+app.use("/api/charities", charityRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+
+// New feature routes (with authentication)
 app.use("/api/donations", authMiddleware, donationRoutes);
-app.use("/api/subscriptions", authMiddleware, subscriptionRoutes);
 app.use("/api/notifications", authMiddleware, notificationRoutes);
 app.use("/api/activity-logs", authMiddleware, activityLogRoutes);
-app.use("/api/charities", charityRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok", message: "Server is running" });
@@ -1418,8 +1420,9 @@ checkPort(PORT, (err) => {
     console.log(`🔗 API available at http://localhost:${PORT}`);
   });
   
-  // Initialize Socket.IO
-  initializeSocket(server);
+  // Initialize Socket.IO and make it available to routes
+  const io = initializeSocket(server);
+  app.set('io', io);
 });
 
 // Generate random coordinates within Dhaka area

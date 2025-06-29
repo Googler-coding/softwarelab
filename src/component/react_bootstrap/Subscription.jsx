@@ -47,9 +47,7 @@ const Subscription = () => {
 
   const fetchAvailablePlans = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/subscriptions/plans/available`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_URL}/api/subscriptions/public/plans`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch plans");
       setAvailablePlans(data);

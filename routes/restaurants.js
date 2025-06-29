@@ -250,7 +250,30 @@ router.put('/orders/:orderId/status', verifyRestaurantToken, async (req, res) =>
     
     await order.save();
     
+    // Add tracking update
+    await order.addTrackingUpdate(status, `Order status updated to ${status} by restaurant`);
+    
     console.log(`Order ${orderId} status updated to ${status} successfully`);
+    
+    // Emit real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.emit("orderUpdate", {
+        orderId: order.orderId,
+        status: order.status,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+      });
+
+      // Emit specific orderStatusUpdate event
+      io.emit("orderStatusUpdate", {
+        orderId: order._id,
+        status: order.status,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+        timestamp: new Date(),
+      });
+    }
     
     res.json({ 
       message: "Order status updated successfully", 
@@ -400,7 +423,6 @@ router.get("/:restaurantId/tables", async (req, res) => {
       const defaultTables = [];
       for (let i = 1; i <= 20; i++) {
         defaultTables.push({
-          _id: `table_${i}`,
           tableNumber: i,
           tableName: `Table ${i}`,
           tableCode: `${String.fromCharCode(65 + Math.floor((i-1) / 10))}${(i-1) % 10 + 1}`,
@@ -420,8 +442,8 @@ router.get("/:restaurantId/tables", async (req, res) => {
     }
 
     // Return tables in the format expected by the frontend
-    const tables = restaurant.tableConfiguration.tableSizes.map(table => ({
-      _id: table._id || `table_${table.tableNumber}`,
+    const tables = restaurant.tableConfiguration.tableSizes.map((table, index) => ({
+      _id: table._id || `table_${table.tableNumber}_${index}`,
       tableNumber: table.tableNumber,
       tableName: table.tableName || `Table ${table.tableNumber}`,
       tableCode: table.tableCode || `${String.fromCharCode(65 + Math.floor((table.tableNumber-1) / 10))}${(table.tableNumber-1) % 10 + 1}`,
