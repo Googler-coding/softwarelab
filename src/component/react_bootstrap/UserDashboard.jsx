@@ -110,6 +110,37 @@ const UserDashboard = () => {
     }
   };
 
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          reason: 'Customer requested cancellation'
+        })
+      });
+
+      if (response.ok) {
+        alert('Order cancelled successfully!');
+        fetchUserOrders(); // Refresh the list
+      } else {
+        const error = await response.json();
+        alert(`Failed to cancel order: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      alert('Failed to cancel order. Please try again.');
+    }
+  };
+
   const getReservationStatusColor = (status) => {
     switch (status) {
       case 'pending':
@@ -354,7 +385,7 @@ const UserDashboard = () => {
                     <div><strong>Guests:</strong> {reservation.numberOfGuests}</div>
                     {reservation.specialRequests && <div><strong>Special Requests:</strong> {reservation.specialRequests}</div>}
                   </div>
-                  {reservation.status === 'pending' && (
+                  {['pending', 'confirmed'].includes(reservation.status) && (
                     <Button variant="danger" size="sm" className="mt-2" onClick={() => cancelReservation(reservation._id)}>
                       Request Cancellation
                     </Button>
@@ -446,6 +477,15 @@ const UserDashboard = () => {
                   >
                     📍 Track Order
                   </button>
+                  {['pending', 'confirmed'].includes(order.status) && (
+                    <button
+                      className="cancel-btn"
+                      onClick={() => cancelOrder(order.orderId)}
+                      style={{ backgroundColor: '#dc3545', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      ❌ Cancel Order
+                    </button>
+                  )}
                 </div>
               </div>
             ))

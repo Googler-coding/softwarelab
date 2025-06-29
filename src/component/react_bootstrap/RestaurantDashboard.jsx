@@ -576,7 +576,7 @@ const RestaurantDashboard = () => {
               {orders.length === 0 ? (
                 <p className="text-muted">No orders yet. Orders will appear here when customers place them.</p>
               ) : (
-                orders.slice(0, 5).map((order) => (
+                orders.map((order) => (
                   <div key={order._id} className="order-item">
                     <div className="order-header">
                       <h6>Order #{order.orderId || order._id.slice(-6)}</h6>
@@ -654,7 +654,7 @@ const RestaurantDashboard = () => {
               {reservations.length === 0 ? (
                 <p className="text-muted">No reservations yet. Reservations will appear here when customers book tables.</p>
               ) : (
-                reservations.slice(0, 5).map((reservation) => (
+                reservations.map((reservation) => (
                   <div key={reservation._id} className="reservation-item">
                     <div className="reservation-header">
                       <h6>Table {reservation.tableName || reservation.tableNumber}</h6>
@@ -721,11 +721,6 @@ const RestaurantDashboard = () => {
                     </div>
                   </div>
                 ))
-              )}
-              {reservations.length > 5 && (
-                <p className="text-muted text-center mt-2">
-                  Showing 5 of {reservations.length} reservations
-                </p>
               )}
             </div>
           </Card.Body>

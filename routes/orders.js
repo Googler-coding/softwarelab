@@ -486,12 +486,38 @@ router.patch("/:orderId/cancel", auth, async (req, res) => {
     await order.save();
 
     // Emit real-time update
-    io.emit("orderUpdate", {
-      orderId: order.orderId,
-      status: order.status,
-      restaurantId: order.restaurantId,
-      userId: order.userId,
-    });
+    const io = req.app.get('io');
+    if (io) {
+      io.emit("orderUpdate", {
+        orderId: order.orderId,
+        status: order.status,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+      });
+
+      // Emit specific orderStatusUpdate event
+      io.emit("orderStatusUpdate", {
+        orderId: order._id,
+        status: order.status,
+        restaurantId: order.restaurantId,
+        userId: order.userId,
+        timestamp: new Date(),
+      });
+
+      // Notify restaurant specifically
+      io.to(`restaurant_${order.restaurantId}`).emit('orderUpdate', {
+        orderId: order.orderId,
+        status: order.status,
+        message: 'Order cancelled by customer'
+      });
+
+      // Notify user specifically
+      io.to(`user_${order.userId}`).emit('orderUpdate', {
+        orderId: order.orderId,
+        status: order.status,
+        message: 'Your order has been cancelled'
+      });
+    }
 
     res.json({ message: "Order cancelled successfully", order });
   } catch (error) {

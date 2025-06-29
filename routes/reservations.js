@@ -297,6 +297,25 @@ router.patch("/:reservationId/status", auth, async (req, res) => {
     reservation.status = status;
     await reservation.save();
 
+    // Emit real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      // Notify restaurant
+      io.to(`restaurant_${reservation.restaurantId}`).emit('reservationUpdate', {
+        restaurantId: reservation.restaurantId,
+        reservationId: reservation._id,
+        status: reservation.status,
+        message: `Reservation status updated to ${status}`
+      });
+
+      // Notify user
+      io.to(`user_${reservation.userId}`).emit('reservationUpdate', {
+        reservationId: reservation._id,
+        status: reservation.status,
+        message: `Your reservation status has been updated to ${status}`
+      });
+    }
+
     res.json({ message: "Reservation status updated", reservation });
   } catch (error) {
     console.error("Error updating reservation status:", error);
@@ -357,6 +376,17 @@ router.patch("/:reservationId/cancel-request", auth, async (req, res) => {
     reservation.updatedAt = new Date();
 
     await reservation.save();
+
+    // Emit real-time update to restaurant
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant_${reservation.restaurantId}`).emit('reservationUpdate', {
+        restaurantId: reservation.restaurantId,
+        reservationId: reservation._id,
+        status: reservation.status,
+        message: 'New cancellation request received'
+      });
+    }
 
     res.json({ 
       message: "Cancellation request sent successfully", 
