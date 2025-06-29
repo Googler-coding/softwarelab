@@ -49,10 +49,14 @@ const tableReservationSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "cancelled", "completed"],
+      enum: ["pending", "confirmed", "cancelled", "completed", "cancel_requested"],
       default: "pending",
     },
     specialRequests: {
+      type: String,
+      default: "",
+    },
+    cancellationReason: {
       type: String,
       default: "",
     },

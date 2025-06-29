@@ -663,8 +663,8 @@ const RestaurantDashboard = () => {
                       </Badge>
                     </div>
                     <div className="reservation-details">
-                      <p><strong>Customer:</strong> {reservation.customerName}</p>
-                      <p><strong>Contact:</strong> {reservation.customerEmail} | {reservation.customerPhone}</p>
+                      <p><strong>Customer:</strong> {reservation.userId?.name || reservation.customerName || 'Unknown'}</p>
+                      <p><strong>Contact:</strong> {reservation.userId?.email || reservation.customerEmail || 'N/A'} | {reservation.userId?.phone || reservation.customerPhone || 'N/A'}</p>
                       <p><strong>Date:</strong> {new Date(reservation.reservationDate).toLocaleDateString()}</p>
                       <p><strong>Time:</strong> {reservation.reservationTime}</p>
                       <p><strong>Guests:</strong> {reservation.numberOfGuests}</p>

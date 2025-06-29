@@ -554,7 +554,7 @@ router.get("/restaurant", auth, async (req, res) => {
     }
 
     const reservations = await TableReservation.find({ 
-      restaurantId: req.user.restaurantId 
+      restaurantId: req.user.id 
     })
     .sort({ reservationDate: 1, reservationTime: 1 })
     .populate('userId', 'name email phone');
