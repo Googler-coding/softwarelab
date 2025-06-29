@@ -14,6 +14,8 @@ import RiderDashboard from "./component/react_bootstrap/RiderDashboard";
 import RestaurantDashboard from "./component/react_bootstrap/RestaurantDashboard";
 import AdminDashboard from "./component/react_bootstrap/AdminDashboard";
 import UserOrderTracking from "./component/react_bootstrap/UserOrderTracking";
+import FoodDonation from "./component/react_bootstrap/FoodDonation";
+import Subscription from "./component/react_bootstrap/Subscription";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 
@@ -179,6 +181,8 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/in-restaurant-order" element={<InRestaurantOrder />} />
+        <Route path="/donate" element={<FoodDonation />} />
+        <Route path="/subscription" element={<Subscription />} />
         <Route
           path="/restaurant-dashboard"
           element={

@@ -8,6 +8,11 @@ import reservationRoutes from "./routes/reservations.js";
 import riderRoutes from "./routes/riders.js";
 import chatRoutes from "./routes/chat.js";
 import restaurantRoutes from "./routes/restaurants.js";
+import donationRoutes from "./routes/donations.js";
+import subscriptionRoutes from "./routes/subscriptions.js";
+import notificationRoutes from "./routes/notifications.js";
+import activityLogRoutes from "./routes/activity-logs.js";
+import charityRoutes from "./routes/charities.js";
 import jwt from "jsonwebtoken";
 import net from "net";
 import Restaurant from "./models/Restaurant.js";
@@ -20,6 +25,11 @@ import Chat from "./models/Chat.js";
 import { initializeSocket } from "./socket.js";
 import Table from "./models/Table.js";
 import TableReservation from "./models/TableReservation.js";
+import FoodDonation from "./models/FoodDonation.js";
+import Charity from "./models/Charity.js";
+import Subscription from "./models/Subscription.js";
+import Notification from "./models/Notification.js";
+import ActivityLog from "./models/ActivityLog.js";
 
 dotenv.config();
 
@@ -232,6 +242,13 @@ app.use("/api/orders", authMiddleware, orderRoutes);
 app.use("/api/reservations", authMiddleware, reservationRoutes);
 app.use("/api/riders", authMiddleware, riderRoutes);
 app.use("/api/chat", chatRoutes);
+
+// New feature routes
+app.use("/api/donations", authMiddleware, donationRoutes);
+app.use("/api/subscriptions", authMiddleware, subscriptionRoutes);
+app.use("/api/notifications", authMiddleware, notificationRoutes);
+app.use("/api/activity-logs", authMiddleware, activityLogRoutes);
+app.use("/api/charities", charityRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok", message: "Server is running" });
