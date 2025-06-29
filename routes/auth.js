@@ -2,9 +2,10 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import Admin from "../models/Admin.js";
 import Rider from "../models/Rider.js";
 import Restaurant from "../models/Restaurant.js";
-import Admin from "../models/Admin.js";
+import auth from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -77,10 +78,10 @@ router.post("/signup/user", async (req, res) => {
 // Rider Signup
 router.post("/signup/rider", async (req, res) => {
   try {
-    const { name, email, nid, password } = req.body;
-    console.log("Rider sign-up attempt:", { name, email, nid });
-    if (!name || !email || !nid || !password) {
-      console.error("Missing required fields", { name, email, nid, password });
+    const { name, email, phone, nid, password } = req.body;
+    console.log("Rider sign-up attempt:", { name, email, phone, nid });
+    if (!name || !email || !phone || !nid || !password) {
+      console.error("Missing required fields", { name, email, phone, nid, password });
       return res.status(400).json({ error: "All fields are required" });
     }
     if (!validateEmail(email)) {
@@ -101,7 +102,7 @@ router.post("/signup/rider", async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const rider = new Rider({ name, email, nid, password: hashedPassword });
+    const rider = new Rider({ name, email, phone, nid, password: hashedPassword });
     await rider.save();
     console.log("Rider registered:", { email, id: rider._id });
 
@@ -160,10 +161,14 @@ router.post("/signup/restaurant", async (req, res) => {
     const lon = 90.3 + Math.random() * 0.3; // Range: 90.3 to 90.6
     
     const restaurant = new Restaurant({
+      name: restaurantName,
       restaurantName,
       ownerName,
       email,
       password: hashedPassword,
+      phone: "Phone number to be updated",
+      address: "Address to be updated",
+      cuisine: "Multi-cuisine",
       lat,
       lon,
     });
@@ -454,6 +459,70 @@ router.post("/signin/admin", async (req, res) => {
     res
       .status(500)
       .json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Get current user information
+router.get("/me", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+    const token = authHeader.substring(7);
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET not defined in environment variables");
+      return res.status(500).json({ error: "Server configuration error" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let user = null;
+
+    // Find user based on role
+    switch (decoded.role) {
+      case 'user':
+        user = await User.findById(decoded.id).select('-password');
+        break;
+      case 'rider':
+        user = await Rider.findById(decoded.id).select('-password');
+        break;
+      case 'restaurant':
+        user = await Restaurant.findById(decoded.id).select('-password');
+        break;
+      case 'admin':
+        user = await Admin.findById(decoded.id).select('-password');
+        break;
+      default:
+        return res.status(400).json({ error: "Invalid user role" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.status(200).json({
+      _id: user._id,
+      name: user.name || user.restaurantName || user.ownerName,
+      email: user.email,
+      phone: user.phone,
+      role: decoded.role,
+      ...(user.restaurantName && { restaurantName: user.restaurantName }),
+      ...(user.ownerName && { ownerName: user.ownerName }),
+      ...(user.nid && { nid: user.nid }),
+    });
+  } catch (err) {
+    console.error("Get current user error:", {
+      message: err.message,
+      stack: err.stack,
+    });
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: "Token expired" });
+    }
+    res.status(500).json({ error: "Internal server error", details: err.message });
   }
 });
 

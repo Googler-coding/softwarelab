@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "node server.js",
     "server": "node server.js",
     "dev:server": "nodemon server.js",
+    "test": "node test-system.js",
+    "reset-db": "node reset-db.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -25,12 +28,15 @@
     "leaflet": "^1.9.4",
     "mongoose": "^8.16.1",
     "node": "^24.2.0",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.1.10",
     "react": "^19.1.0",
     "react-bootstrap": "^2.10.9",
     "react-dom": "^19.0.0",
     "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.6.3"
+    "react-router-dom": "^7.6.3",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

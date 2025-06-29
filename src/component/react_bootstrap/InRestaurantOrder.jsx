@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Tooltip } from "react-leaflet";
+import React, { useState, useEffect, useCallback } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from "react-leaflet";
+import { Card, Form, Button, Alert, Spinner, Badge, Modal, Tabs, Tab } from "react-bootstrap";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../css/InRestaurantOrder.css";
+import OrderTracking from "./OrderTracking";
+import TableReservation from "./TableReservation";
 
 // Use default icon to avoid loading issues
 const defaultIcon = L.icon({
@@ -26,6 +29,51 @@ const restaurantIcon = L.icon({
   shadowSize: [41, 41],
 });
 
+// Map component that handles map updates
+function MapUpdater({ userLocation, restaurants, onRestaurantSelect }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (userLocation && userLocation.length === 2) {
+      map.setView(userLocation, 13);
+      console.log("Map centered to user location:", userLocation);
+    }
+  }, [userLocation, map]);
+
+  useEffect(() => {
+    // Clear existing markers
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker) {
+        map.removeLayer(layer);
+      }
+    });
+
+    // Add new markers
+    restaurants.forEach((restaurant) => {
+      if (restaurant.lat && restaurant.lon) {
+        const marker = L.marker([restaurant.lat, restaurant.lon], { icon: restaurantIcon })
+          .addTo(map)
+          .bindPopup(
+            `<div style="text-align: center;">
+              <h6 style="margin: 0 0 8px 0; color: #2c3e50;">${restaurant.name || restaurant.restaurantName}</h6>
+              <p style="margin: 0 0 8px 0; color: #7f8c8d;">Click to view menu</p>
+              <button onclick="window.selectRestaurant('${restaurant._id}')" 
+                      style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                View Menu
+              </button>
+            </div>`
+          );
+        
+        marker.on('click', () => {
+          onRestaurantSelect(restaurant);
+        });
+      }
+    });
+  }, [restaurants, map, onRestaurantSelect]);
+
+  return null;
+}
+
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const toRad = (x) => (x * Math.PI) / 180;
   const R = 6371;
@@ -38,162 +86,173 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-const InRestaurantOrder = () => {
-  const [userLocation, setUserLocation] = useState(null);
-  const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
+function InRestaurantOrder() {
+  const [restaurants, setRestaurants] = useState([]);
   const [selected, setSelected] = useState(null);
   const [cart, setCart] = useState([]);
-  const [restaurants, setRestaurants] = useState([]);
-  const [nearestRestaurants, setNearestRestaurants] = useState([]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [orderType, setOrderType] = useState("delivery");
+  const [showTableReservation, setShowTableReservation] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const token = localStorage.getItem("token");
 
+  // Add global function for marker click
   useEffect(() => {
-    // Check if user is logged in
-    if (token) {
-      console.log("Token found:", token.substring(0, 20) + "...");
-      setIsLoggedIn(true);
-      fetchRestaurants();
-    } else {
-      console.log("No token found, user not logged in");
-      setError("Please log in to view restaurants");
-    }
+    window.selectRestaurant = (restaurantId) => {
+      const restaurant = restaurants.find(r => r._id === restaurantId);
+      if (restaurant) {
+        handleSelect(restaurant);
+      }
+    };
 
-    // Get user location
+    return () => {
+      delete window.selectRestaurant;
+    };
+  }, [restaurants]);
+
+  useEffect(() => {
+    getCurrentLocation();
+    fetchRestaurants();
+  }, []);
+
+  const getCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = [pos.coords.latitude, pos.coords.longitude];
-          console.log("User location obtained:", coords);
-          setUserLocation(coords);
+        (position) => {
+          const newLocation = [position.coords.latitude, position.coords.longitude];
+          setUserLocation(newLocation);
+          console.log("User location updated:", newLocation);
         },
         (error) => {
-          console.log("Geolocation error:", error);
-          // Fallback to Dhaka coordinates
-          const fallback = [23.8103, 90.4125];
-          console.log("Using fallback location:", fallback);
-          setUserLocation(fallback);
+          console.error("Error getting location:", error);
+          // Default to Dhaka coordinates
+          const defaultLocation = [23.8103, 90.4125];
+          setUserLocation(defaultLocation);
+          console.log("Using default location:", defaultLocation);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
         }
       );
     } else {
-      console.log("Geolocation not supported, using fallback");
-      const fallback = [23.8103, 90.4125];
-      setUserLocation(fallback);
+      // Default to Dhaka coordinates
+      const defaultLocation = [23.8103, 90.4125];
+      setUserLocation(defaultLocation);
+      console.log("Geolocation not supported, using default location:", defaultLocation);
     }
-  }, [token]);
+  };
 
   const fetchRestaurants = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/restaurants`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      const headers = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${API_URL}/api/public/restaurants`, {
+        headers,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to fetch restaurants");
-      
-      console.log("Fetched restaurants:", data);
-      console.log("Number of restaurants:", data.length);
-      
-      // Filter out restaurants with empty names
-      const validRestaurants = data.filter(r => r.name && r.name.trim() !== "");
-      console.log("Valid restaurants with names:", validRestaurants.length);
-      
-      setRestaurants(validRestaurants);
+      setRestaurants(data);
+      setLoading(false);
     } catch (err) {
-      console.error("Error fetching restaurants:", err);
       setError(err.message);
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (userLocation && restaurants.length > 0) {
-      const nearest = [...restaurants]
-        .map((r) => ({
-          ...r,
-          distance: haversineDistance(
-            userLocation[0],
-            userLocation[1],
-            r.lat,
-            r.lon
-          ),
-        }))
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 3);
-      setNearestRestaurants(nearest);
-    }
-  }, [userLocation, restaurants]);
-
-  useEffect(() => {
-    if (!query.trim()) setSuggestions([]);
-    else {
-      const filtered = restaurants
-        .filter((r) => ((r.name || "").toLowerCase().includes(query.toLowerCase())))
-        .slice(0, 5);
-      setSuggestions(filtered);
-    }
-  }, [query, restaurants]);
-
-  const handleSelect = (restaurant) => {
+  const handleSelect = useCallback(async (restaurant) => {
     setSelected(restaurant);
-    setQuery(restaurant.name);
-    setSuggestions([]);
-    setCart([]);
-  };
+    setCart([]); // Clear cart when selecting new restaurant
+    
+    // Fetch menu items for the selected restaurant
+    if (restaurant._id) {
+      try {
+        const res = await fetch(`${API_URL}/api/restaurants/${restaurant._id}/menu`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const menuData = await res.json();
+        if (res.ok) {
+          setSelected(prev => ({ ...prev, menu: menuData }));
+        }
+      } catch (err) {
+        console.error('Failed to fetch menu:', err);
+      }
+    }
+  }, [token, API_URL]);
 
   const handleAddToCart = (item) => {
-    setCart((prev) => {
-      const exists = prev.find((i) => i.id === item._id);
-      return exists
-        ? prev.map((i) => (i.id === item._id ? { ...i, qty: i.qty + 1 } : i))
-        : [...prev, { ...item, id: item._id, qty: 1 }];
-    });
+    const existingItem = cart.find((cartItem) => cartItem._id === item._id);
+    if (existingItem) {
+      setCart(
+        cart.map((cartItem) =>
+          cartItem._id === item._id
+            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            : cartItem
+        )
+      );
+    } else {
+      setCart([...cart, { ...item, quantity: 1 }]);
+    }
   };
 
-  const incrementQty = (id) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, qty: item.qty + 1 } : item
-      )
-    );
+  const handleRemoveFromCart = (itemId) => {
+    setCart(cart.filter((item) => item._id !== itemId));
   };
 
-  const decrementQty = (id) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, qty: Math.max(1, item.qty - 1) } : item
-      )
-    );
+  const handleUpdateQuantity = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      handleRemoveFromCart(itemId);
+    } else {
+      setCart(
+        cart.map((item) =>
+          item._id === itemId ? { ...item, quantity: newQuantity } : item
+        )
+      );
+    }
   };
-
-  const handleRemoveFromCart = (id) => setCart(cart.filter((i) => i.id !== id));
 
   const handlePlaceOrder = async () => {
-    if (total === 0) return alert("Select at least one item.");
+    if (cart.length === 0) {
+      alert("Please add items to cart first");
+      return;
+    }
+
+    if (!token) {
+      alert("Please sign in to place an order");
+      return;
+    }
+
     try {
-      // Get user details from localStorage or use default
-      const userName = localStorage.getItem("userName") || "Customer";
-      const userEmail = localStorage.getItem("userEmail") || "customer@example.com";
-      const userPhone = localStorage.getItem("userPhone") || "Phone not provided";
-      
-      const order = {
+      const orderData = {
         restaurantId: selected._id,
-        customerName: userName,
-        customerEmail: userEmail,
-        customerPhone: userPhone,
-        customerAddress: "Delivery Address", // This could be enhanced with real address input
+        restaurantName: selected.name,
+        customerName: localStorage.getItem('userName') || 'User',
+        customerEmail: localStorage.getItem('userEmail') || 'user@example.com',
+        customerPhone: localStorage.getItem('userPhone') || '1234567890',
+        customerAddress: userLocation ? `${userLocation[0]}, ${userLocation[1]}` : "User address to be updated",
         items: cart.map((item) => ({
           name: item.name,
           price: item.price,
-          quantity: item.qty,
+          quantity: item.quantity,
+          specialInstructions: item.specialInstructions || "",
         })),
-        total,
-        status: "pending",
+        total: cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        orderType,
+        estimatedDeliveryTime: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes from now
+        paymentMethod: "cash",
+        specialInstructions: "",
       };
 
       const res = await fetch(`${API_URL}/api/orders`, {
@@ -202,264 +261,329 @@ const InRestaurantOrder = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(order),
+        body: JSON.stringify(orderData),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to place order");
 
-      alert(`Order placed successfully! Order ID: #${data.order.orderId.slice(-6)}\nTotal: $${total.toFixed(2)}\nEstimated delivery: 30 minutes`);
+      alert("Order placed successfully! You can track it in 'My Orders'.");
       setCart([]);
       setSelected(null);
     } catch (err) {
-      setError(err.message);
+      alert(`Error placing order: ${err.message}`);
     }
   };
 
-  const total = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
+  const handleTableReservation = () => {
+    setShowTableReservation(true);
+  };
 
-  if (!isLoggedIn) {
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const filtered = restaurants.filter(restaurant =>
+      restaurant.name.toLowerCase().includes(query.toLowerCase()) ||
+      (restaurant.cuisine && restaurant.cuisine.toLowerCase().includes(query.toLowerCase()))
+    );
+
+    setSuggestions(filtered.slice(0, 5));
+    setShowSuggestions(true);
+  };
+
+  const handleSuggestionClick = (restaurant) => {
+    setSearchQuery(restaurant.name);
+    setShowSuggestions(false);
+    handleSelect(restaurant);
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (suggestions.length > 0) {
+      handleSuggestionClick(suggestions[0]);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="inrestaurant-container">
-        <h2>In-Restaurant Order</h2>
-        <div className="error-message">
-          Please log in to view and order from restaurants.
+        <div className="loading-container">
+          <Spinner animation="border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </Spinner>
+          <p>Loading restaurants...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="inrestaurant-container">
+        <Alert variant="danger">{error}</Alert>
       </div>
     );
   }
 
   return (
     <div className="inrestaurant-container">
-      <h2>In-Restaurant Order</h2>
-      {error && <div className="error-message">{error}</div>}
+      <div className="header-section">
+        <h2>🍽️ Find & Order from Restaurants</h2>
+        <p>Discover restaurants near you and place orders instantly</p>
+      </div>
 
-      <div className="floating-search-wrapper">
-        <input
-          type="text"
-          placeholder="Search restaurants..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onClick={() => {
-            setSelected(null);
-            setCart([]);
-          }}
-          onKeyDown={(e) =>
-            e.key === "Enter" &&
-            suggestions.length > 0 &&
-            handleSelect(suggestions[0])
-          }
-          className="floating-search-input"
-        />
-        <button
-          className="search-icon-btn"
-          onClick={() =>
-            suggestions.length > 0 && handleSelect(suggestions[0])
-          }>
-          🔍
-        </button>
-        {suggestions.length > 0 && (
-          <ul className="suggestions-floating">
-            {suggestions.map((r) => (
-              <li key={r._id} onClick={() => handleSelect(r)}>
-                {r.name}
-              </li>
-            ))}
-          </ul>
+      {/* Enhanced Search Section */}
+      <div className="search-section">
+        <div className="floating-search-wrapper">
+          <form onSubmit={handleSearchSubmit} className="search-form">
+            <div className="search-input-group">
+              <input
+                type="text"
+                placeholder="Search restaurants or cuisines..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="search-input"
+                onFocus={() => setShowSuggestions(true)}
+              />
+              <button type="submit" className="search-icon-btn">
+                🔍
+              </button>
+            </div>
+            
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="suggestions-floating">
+                {suggestions.map((restaurant) => (
+                  <li
+                    key={restaurant._id}
+                    onClick={() => handleSuggestionClick(restaurant)}
+                  >
+                    <div className="suggestion-item">
+                      <span className="restaurant-name">{restaurant.name}</span>
+                      {restaurant.cuisine && (
+                        <span className="cuisine-type">{restaurant.cuisine}</span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </form>
+        </div>
+      </div>
+
+      <div className="content-section">
+        <div className="map-section">
+          <div style={{ 
+            height: '500px', 
+            width: '100%', 
+            background: '#f0f0f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            fontWeight: 'bold'
+          }}>
+            {userLocation ? (
+              <MapContainer
+                center={userLocation}
+                zoom={13}
+                style={{ height: "100%", width: "100%" }}
+                key={userLocation.join(',')} // Force re-render when location changes
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
+                <MapUpdater 
+                  userLocation={userLocation}
+                  restaurants={restaurants}
+                  onRestaurantSelect={handleSelect}
+                />
+              </MapContainer>
+            ) : (
+              "Loading map..."
+            )}
+          </div>
+        </div>
+
+        {selected && (
+          <div className="order-section">
+            <div className="restaurant-info">
+              <h3>{selected.name}</h3>
+              <p>📍 {selected.address || "Address not available"}</p>
+              {userLocation && (
+                <p>
+                  📏 {haversineDistance(
+                    userLocation[0],
+                    userLocation[1],
+                    selected.lat,
+                    selected.lon
+                  ).toFixed(1)} km away
+                </p>
+              )}
+            </div>
+
+            {/* Order Type Selection */}
+            <div className="order-type-section">
+              <h4>Select Order Type</h4>
+              <div className="order-type-buttons">
+                <Button
+                  variant={orderType === "delivery" ? "primary" : "outline-primary"}
+                  onClick={() => setOrderType("delivery")}
+                  className="order-type-btn"
+                >
+                  🚚 Delivery
+                </Button>
+                <Button
+                  variant={orderType === "takeaway" ? "primary" : "outline-primary"}
+                  onClick={() => setOrderType("takeaway")}
+                  className="order-type-btn"
+                >
+                  📦 Takeaway
+                </Button>
+                <Button
+                  variant={orderType === "dine-in" ? "primary" : "outline-primary"}
+                  onClick={() => setOrderType("dine-in")}
+                  className="order-type-btn"
+                >
+                  🍽️ Dine-in
+                </Button>
+              </div>
+            </div>
+
+            {/* Table Reservation for Dine-in */}
+            {orderType === "dine-in" && (
+              <div className="table-reservation-section">
+                <Alert variant="info">
+                  <Alert.Heading>🍽️ Table Reservation</Alert.Heading>
+                  <p>
+                    For dine-in orders, you can reserve a table in advance to ensure availability.
+                  </p>
+                  <Button 
+                    variant="outline-primary" 
+                    onClick={handleTableReservation}
+                    className="reserve-table-btn"
+                  >
+                    Reserve Table
+                  </Button>
+                </Alert>
+              </div>
+            )}
+
+            {/* Menu Items */}
+            <div className="menu-section">
+              <h4>Menu</h4>
+              <div className="menu-list">
+                {selected.menu && selected.menu.length > 0 ? (
+                  selected.menu.map((item) => (
+                    <div key={item._id} className="menu-item">
+                      <div className="menu-item-content">
+                        <div className="menu-item-info">
+                          <h5 className="menu-item-name">{item.name}</h5>
+                          <p className="menu-item-price">৳{item.price}</p>
+                        </div>
+                        <button 
+                          className="add-to-cart-btn"
+                          onClick={() => handleAddToCart(item)}
+                        >
+                          <span className="btn-icon">+</span>
+                          <span className="btn-text">Add to Cart</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="no-menu-message">
+                    <p>🍽️ No menu items available</p>
+                    <p>Please check back later or contact the restaurant.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Cart Section */}
+            {cart.length > 0 && (
+              <div className="cart-section">
+                <h4>🛒 Your Cart</h4>
+                <div className="cart-items">
+                  {cart.map((item) => (
+                    <div key={item._id} className="cart-item">
+                      <div className="cart-item-content">
+                        <div className="cart-item-info">
+                          <h6 className="cart-item-name">{item.name}</h6>
+                          <p className="cart-item-price">৳{item.price}</p>
+                        </div>
+                        <div className="cart-item-controls">
+                          <div className="qty-controls">
+                            <button
+                              onClick={() => handleUpdateQuantity(item._id, item.quantity - 1)}
+                              className="qty-btn"
+                            >
+                              -
+                            </button>
+                            <span className="qty-display">{item.quantity}</span>
+                            <button
+                              onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
+                              className="qty-btn"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveFromCart(item._id)}
+                            className="remove-btn"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="cart-total">
+                  <h5>
+                    Total: ৳{cart.reduce((sum, item) => sum + item.price * item.quantity, 0)}
+                  </h5>
+                  <Button
+                    onClick={handlePlaceOrder}
+                    className="place-order-btn"
+                    variant="success"
+                    size="lg"
+                  >
+                    🚀 Place Order
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      <div className="map-section">
-        <div style={{ 
-          height: '500px', 
-          width: '100%', 
-          background: '#f0f0f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '18px',
-          fontWeight: 'bold'
-        }}>
-          {(() => {
-            try {
-              if (typeof L === 'undefined') {
-                return (
-                  <div style={{ textAlign: 'center', padding: '20px' }}>
-                    <div>Leaflet not loaded - Check console for errors</div>
-                    <div style={{ marginTop: '20px', fontSize: '14px' }}>
-                      <strong>Restaurant Locations (Text View):</strong><br/>
-                      {restaurants.map(r => (
-                        <div key={r._id} style={{ margin: '5px 0' }}>
-                          {r.name}: {r.lat.toFixed(4)}, {r.lon.toFixed(4)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-              
-              return (
-                <MapContainer
-                  center={userLocation || [23.8103, 90.4125]}
-                  zoom={15}
-                  style={{ height: "100%", width: "100%" }}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  
-                  {userLocation && (
-                    <Marker position={userLocation} icon={defaultIcon}>
-                      <Popup>You are here</Popup>
-                      <Tooltip permanent direction="top">
-                        Me
-                      </Tooltip>
-                    </Marker>
-                  )}
-
-                  {restaurants.map((r) => {
-                    return (
-                      <Marker 
-                        key={r._id} 
-                        position={[r.lat, r.lon]} 
-                        icon={restaurantIcon}
-                        eventHandlers={{
-                          click: () => {
-                            console.log("Restaurant marker clicked:", r.name);
-                            handleSelect(r);
-                          }
-                        }}
-                      >
-                        <Popup>
-                          <div>
-                            <strong>{r.name}</strong>
-                            <br />
-                            {userLocation
-                              ? haversineDistance(
-                                  userLocation[0],
-                                  userLocation[1],
-                                  r.lat,
-                                  r.lon
-                                ).toFixed(2)
-                              : "N/A"}{" "}
-                            km away
-                            <br />
-                            <button 
-                              onClick={() => handleSelect(r)}
-                              style={{
-                                marginTop: '10px',
-                                padding: '5px 10px',
-                                backgroundColor: '#667eea',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              View Menu
-                            </button>
-                          </div>
-                        </Popup>
-                        <Tooltip direction="top" offset={[0, -10]} permanent>
-                          {r.name}
-                        </Tooltip>
-                      </Marker>
-                    );
-                  })}
-                </MapContainer>
-              );
-            } catch (error) {
-              console.error("Error rendering map:", error);
-              return (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <div>Map Error: {error.message}</div>
-                  <div style={{ marginTop: '20px', fontSize: '14px' }}>
-                    <strong>Restaurant Locations (Text View):</strong><br/>
-                    {restaurants.map(r => (
-                      <div key={r._id} style={{ margin: '5px 0' }}>
-                        {r.name}: {r.lat.toFixed(4)}, {r.lon.toFixed(4)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
-          })()}
-        </div>
-      </div>
-
-      {selected && (
-        <div className="order-section">
-          <h3>{selected.name}</h3>
-          <p>
-            Distance:{" "}
-            {userLocation
-              ? haversineDistance(
-                  userLocation[0],
-                  userLocation[1],
-                  selected.lat,
-                  selected.lon
-                ).toFixed(2)
-              : "N/A"}{" "}
-            km
-          </p>
-
-          <h4>Menu</h4>
-          <div className="menu-list">
-            {selected.menu && selected.menu.length > 0 ? (
-              selected.menu.map((item) => (
-                <div key={item._id} className="menu-item">
-                  <span data-price={`$${item.price.toFixed(2)}`}>
-                    {item.name}
-                  </span>
-                  <button onClick={() => handleAddToCart(item)}>
-                    Add to Cart
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div className="no-items">No menu items available</div>
-            )}
-          </div>
-
-          <div className="cart">
-            <h4>Cart</h4>
-            {cart.length === 0 ? (
-              <div className="no-items">No items selected.</div>
-            ) : (
-              <>
-                {cart.map((item) => (
-                  <div key={item.id} className="cart-item">
-                    <div className="cart-item-content">
-                      <span data-price={`$${(item.qty * item.price).toFixed(2)}`}>
-                        {item.name}
-                      </span>
-                    </div>
-                    <div className="cart-item-controls">
-                      <div className="qty-controls">
-                        <button onClick={() => decrementQty(item.id)}>-</button>
-                        <span>{item.qty}</span>
-                        <button onClick={() => incrementQty(item.id)}>+</button>
-                      </div>
-                      <button onClick={() => handleRemoveFromCart(item.id)}>
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <div className="cart-total">
-                  <h4>Total: ${total.toFixed(2)}</h4>
-                </div>
-                <button 
-                  className="place-order-btn" 
-                  onClick={handlePlaceOrder}
-                  disabled={total === 0}>
-                  Place Order
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Table Reservation Modal */}
+      <Modal
+        show={showTableReservation}
+        onHide={() => setShowTableReservation(false)}
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>🍽️ Table Reservation</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <TableReservation
+            restaurantId={selected?._id}
+            onReservationComplete={() => setShowTableReservation(false)}
+          />
+        </Modal.Body>
+      </Modal>
     </div>
   );
-};
+}
 
 export default InRestaurantOrder;

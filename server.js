@@ -3,14 +3,23 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.js";
+import orderRoutes from "./routes/orders.js";
+import reservationRoutes from "./routes/reservations.js";
+import riderRoutes from "./routes/riders.js";
+import chatRoutes from "./routes/chat.js";
+import restaurantRoutes from "./routes/restaurants.js";
 import jwt from "jsonwebtoken";
 import net from "net";
 import Restaurant from "./models/Restaurant.js";
+import Order from "./models/Order.js";
 import bcrypt from "bcryptjs";
 import Admin from "./models/Admin.js";
 import Rider from "./models/Rider.js";
 import User from "./models/User.js";
 import Chat from "./models/Chat.js";
+import { initializeSocket } from "./socket.js";
+import Table from "./models/Table.js";
+import TableReservation from "./models/TableReservation.js";
 
 dotenv.config();
 
@@ -60,10 +69,7 @@ const MONGO_URI =
   process.env.MONGO_URI || "mongodb://localhost:27017/foodDeliveryApp";
 
 mongoose
-  .connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(MONGO_URI)
   .then(() => {
     console.log("MongoDB connected");
     // Update existing restaurants with random coordinates
@@ -89,54 +95,6 @@ const menuItemSchema = new mongoose.Schema({
 
 const MenuItem = mongoose.model("MenuItem", menuItemSchema);
 
-const orderSchema = new mongoose.Schema({
-  restaurantId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Restaurant",
-    required: true,
-  },
-  customerName: { type: String, required: true },
-  customerEmail: { type: String, required: true },
-  items: [
-    {
-      name: { type: String, required: true },
-      price: { type: Number, required: true },
-      quantity: { type: Number, required: true },
-    },
-  ],
-  total: { type: Number, required: true },
-  status: { 
-    type: String, 
-    required: true, 
-    enum: ['pending', 'preparing', 'ready', 'assigned', 'picked_up', 'on_way', 'delivered', 'cancelled'],
-    default: "pending" 
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Restaurant",
-    required: true,
-  },
-  // New fields for rider assignment
-  riderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Rider",
-    default: null
-  },
-  assignedAt: { type: Date },
-  pickedUpAt: { type: Date },
-  deliveredAt: { type: Date },
-  customerAddress: { type: String },
-  customerPhone: { type: String },
-  estimatedDeliveryTime: { type: Date },
-  actualDeliveryTime: { type: Date },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-}, {
-  timestamps: true
-});
-
-const Order = mongoose.model("Order", orderSchema);
-
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) {
@@ -156,8 +114,13 @@ const authMiddleware = (req, res, next) => {
     console.log("Decoded token:", decoded);
     
     // Allow all authenticated users for general endpoints
-    req.userId = decoded.id;
-    req.userRole = decoded.role;
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      name: decoded.name,
+      email: decoded.email,
+      phone: decoded.phone,
+    };
     next();
   } catch (error) {
     console.error("Token verification error:", {
@@ -195,11 +158,16 @@ const restaurantAuthMiddleware = (req, res, next) => {
     if (decoded.role !== "restaurant") {
       return res.status(403).json({ message: "Restaurant access required" });
     }
-    req.userId = decoded.id;
-    req.userRole = decoded.role;
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      name: decoded.name,
+      email: decoded.email,
+    };
     next();
   } catch (error) {
-    res.status(401).json({ message: "Authentication error", details: error.message });
+    console.error("Restaurant auth error:", error);
+    res.status(401).json({ message: "Authentication error" });
   }
 };
 
@@ -217,13 +185,53 @@ const riderAuthMiddleware = (req, res, next) => {
     if (decoded.role !== "rider") {
       return res.status(403).json({ message: "Rider access required" });
     }
-    req.userId = decoded.id;
-    req.userRole = decoded.role;
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      name: decoded.name,
+      email: decoded.email,
+    };
     next();
   } catch (error) {
-    res.status(401).json({ message: "Authentication error", details: error.message });
+    console.error("Rider auth error:", error);
+    res.status(401).json({ message: "Authentication error" });
   }
 };
+
+// User-specific middleware
+const userAuthMiddleware = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+  try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ message: "Server configuration error" });
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== "user") {
+      return res.status(403).json({ message: "User access required" });
+    }
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      name: decoded.name,
+      email: decoded.email,
+    };
+    next();
+  } catch (error) {
+    console.error("User auth error:", error);
+    res.status(401).json({ message: "Authentication error" });
+  }
+};
+
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/restaurants", restaurantRoutes);
+app.use("/api/orders", authMiddleware, orderRoutes);
+app.use("/api/reservations", authMiddleware, reservationRoutes);
+app.use("/api/riders", authMiddleware, riderRoutes);
+app.use("/api/chat", chatRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok", message: "Server is running" });
@@ -231,9 +239,9 @@ app.get("/api/health", (req, res) => {
 
 app.get("/api/menu/:userId", restaurantAuthMiddleware, async (req, res) => {
   try {
-    if (req.userId !== req.params.userId) {
+    if (req.user.id !== req.params.userId) {
       console.error("Unauthorized: userId mismatch", {
-        requestUserId: req.userId,
+        requestUserId: req.user.id,
         paramUserId: req.params.userId,
       });
       return res.status(403).json({ message: "Unauthorized" });
@@ -262,9 +270,9 @@ app.post("/api/menu", restaurantAuthMiddleware, async (req, res) => {
         .status(400)
         .json({ message: "Name, price, and userId are required" });
     }
-    if (req.userId !== userId) {
+    if (req.user.id !== userId) {
       console.error("Unauthorized: userId mismatch", {
-        requestUserId: req.userId,
+        requestUserId: req.user.id,
         bodyUserId: userId,
       });
       return res.status(403).json({ message: "Unauthorized" });
@@ -307,9 +315,9 @@ app.put("/api/menu/:id", restaurantAuthMiddleware, async (req, res) => {
       console.error("Item not found", { id: req.params.id });
       return res.status(404).json({ message: "Item not found" });
     }
-    if (item.userId !== req.userId) {
+    if (item.userId !== req.user.id) {
       console.error("Unauthorized: userId mismatch", {
-        requestUserId: req.userId,
+        requestUserId: req.user.id,
         itemUserId: item.userId,
       });
       return res.status(403).json({ message: "Unauthorized" });
@@ -337,9 +345,9 @@ app.delete("/api/menu/:id", restaurantAuthMiddleware, async (req, res) => {
       console.error("Item not found", { id: req.params.id });
       return res.status(404).json({ message: "Item not found" });
     }
-    if (item.userId !== req.userId) {
+    if (item.userId !== req.user.id) {
       console.error("Unauthorized: userId mismatch", {
-        requestUserId: req.userId,
+        requestUserId: req.user.id,
         itemUserId: item.userId,
       });
       return res.status(403).json({ message: "Unauthorized" });
@@ -358,7 +366,7 @@ app.delete("/api/menu/:id", restaurantAuthMiddleware, async (req, res) => {
   }
 });
 
-app.get("/api/restaurants", authMiddleware, async (req, res) => {
+app.get("/api/public/restaurants", async (req, res) => {
   try {
     const restaurants = await Restaurant.find({}, "restaurantName lat lon _id");
     const restaurantsWithMenu = await Promise.all(
@@ -384,98 +392,11 @@ app.get("/api/restaurants", authMiddleware, async (req, res) => {
   }
 });
 
-app.post("/api/orders", authMiddleware, async (req, res) => {
-  try {
-    const { restaurantId, customerName, customerEmail, items, total, status, customerAddress, customerPhone } = req.body;
-    console.log("Received order payload:", {
-      restaurantId,
-      customerName,
-      customerEmail,
-      items,
-      total,
-      status,
-      customerAddress,
-      customerPhone,
-      userId: req.userId,
-      userRole: req.userRole,
-    });
-    
-    if (!restaurantId || !customerName || !customerEmail || !items || !total) {
-      console.error("Missing required fields", {
-        restaurantId,
-        customerName,
-        customerEmail,
-        items,
-        total,
-      });
-      return res.status(400).json({ message: "All fields are required" });
-    }
-    
-    if (items.length === 0) {
-      console.error("Order must contain at least one item");
-      return res
-        .status(400)
-        .json({ message: "Order must contain at least one item" });
-    }
-    
-    const restaurant = await Restaurant.findById(restaurantId);
-    if (!restaurant) {
-      console.error("Restaurant not found", { restaurantId });
-      return res.status(404).json({ message: "Restaurant not found" });
-    }
-    
-    // Calculate estimated delivery time (30 minutes from now)
-    const estimatedDeliveryTime = new Date(Date.now() + 30 * 60 * 1000);
-    
-    const order = new Order({
-      restaurantId,
-      customerName,
-      customerEmail,
-      items,
-      total,
-      status: status || "pending",
-      userId: restaurantId, // Link order to restaurant, not the user placing the order
-      customerAddress: customerAddress || "Address not provided",
-      customerPhone: customerPhone || "Phone not provided",
-      estimatedDeliveryTime,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-    
-    await order.save();
-    console.log("Saved order with full tracking:", {
-      orderId: order._id,
-      restaurantId: order.restaurantId,
-      customerName: order.customerName,
-      customerEmail: order.customerEmail,
-      total: order.total,
-      status: order.status,
-      estimatedDeliveryTime: order.estimatedDeliveryTime,
-      createdAt: order.createdAt
-    });
-    
-    res.status(201).json({ 
-      message: "Order placed successfully", 
-      order: {
-        ...order._doc,
-        orderId: order._id,
-        restaurantName: restaurant.restaurantName
-      }
-    });
-  } catch (error) {
-    console.error("Error saving order:", {
-      message: error.message,
-      stack: error.stack,
-    });
-    res.status(400).json({ message: error.message });
-  }
-});
-
 app.get("/api/orders/:userId", restaurantAuthMiddleware, async (req, res) => {
   try {
-    if (req.userId !== req.params.userId) {
+    if (req.user.id !== req.params.userId) {
       console.error("Unauthorized: userId mismatch", {
-        requestUserId: req.userId,
+        requestUserId: req.user.id,
         paramUserId: req.params.userId,
       });
       return res.status(403).json({ message: "Unauthorized" });
@@ -499,7 +420,7 @@ app.get("/api/orders/:userId", restaurantAuthMiddleware, async (req, res) => {
 // Admin endpoint to get all orders
 app.get("/api/admin/orders", authMiddleware, async (req, res) => {
   try {
-    if (req.userRole !== "admin") {
+    if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
     
@@ -530,51 +451,36 @@ app.get("/api/admin/orders", authMiddleware, async (req, res) => {
   }
 });
 
-// Update order status
-app.put("/api/orders/:orderId/status", restaurantAuthMiddleware, async (req, res) => {
+// Admin endpoint to get all reservations
+app.get("/api/admin/reservations", authMiddleware, async (req, res) => {
   try {
-    const { status } = req.body;
-    const { orderId } = req.params;
-    
-    if (!status) {
-      return res.status(400).json({ message: "Status is required" });
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
     }
     
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
+    const TableReservation = mongoose.model("TableReservation");
+    const reservations = await TableReservation.find()
+      .populate("restaurantId", "restaurantName address")
+      .populate("userId", "name email phone")
+      .sort({ reservationDate: -1, reservationTime: -1 }); // Most recent first
     
-    // Check if the restaurant owns this order (using restaurantId)
-    if (order.restaurantId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
+    console.log("Admin fetched all reservations:", {
+      totalReservations: reservations.length,
+      reservationsByStatus: reservations.reduce((acc, reservation) => {
+        acc[reservation.status] = (acc[reservation.status] || 0) + 1;
+        return acc;
+      }, {})
+    });
     
-    // Validate status transitions for restaurants
-    const validRestaurantStatuses = ['preparing', 'ready'];
-    if (!validRestaurantStatuses.includes(status)) {
-      return res.status(400).json({ message: "Invalid status for restaurant" });
-    }
-    
-    const updatedOrder = await Order.findByIdAndUpdate(
-      orderId,
-      { 
-        status,
-        updatedAt: new Date()
-      },
-      { new: true }
-    );
-    
-    console.log("Updated order status:", { orderId, status });
-    res.json(updatedOrder);
+    res.json(reservations);
   } catch (error) {
-    console.error("Error updating order status:", {
+    console.error("Error fetching all reservations:", {
       message: error.message,
       stack: error.stack,
     });
     res
       .status(500)
-      .json({ message: "Failed to update order status", details: error.message });
+      .json({ message: "Failed to fetch reservations", details: error.message });
   }
 });
 
@@ -619,7 +525,7 @@ app.post("/api/rider/accept-order/:orderId", riderAuthMiddleware, async (req, re
     }
     
     // Get rider details for tracking
-    const rider = await Rider.findById(req.userId);
+    const rider = await Rider.findById(req.user.id);
     if (!rider) {
       return res.status(404).json({ message: "Rider not found" });
     }
@@ -628,7 +534,7 @@ app.post("/api/rider/accept-order/:orderId", riderAuthMiddleware, async (req, re
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
       { 
-        riderId: req.userId,
+        riderId: req.user.id,
         status: "assigned",
         assignedAt: new Date(),
         updatedAt: new Date()
@@ -637,7 +543,7 @@ app.post("/api/rider/accept-order/:orderId", riderAuthMiddleware, async (req, re
     ).populate("restaurantId", "restaurantName lat lon");
     
     // Update rider status to busy
-    await Rider.findByIdAndUpdate(req.userId, {
+    await Rider.findByIdAndUpdate(req.user.id, {
       status: "busy",
       currentOrder: orderId,
       updatedAt: new Date()
@@ -645,7 +551,7 @@ app.post("/api/rider/accept-order/:orderId", riderAuthMiddleware, async (req, re
     
     console.log("Rider accepted order with full tracking:", { 
       orderId, 
-      riderId: req.userId,
+      riderId: req.user.id,
       riderName: rider.name,
       restaurantName: updatedOrder.restaurantId.restaurantName,
       customerName: updatedOrder.customerName,
@@ -680,12 +586,12 @@ app.put("/api/rider/location", riderAuthMiddleware, async (req, res) => {
     }
     
     const updatedRider = await Rider.findByIdAndUpdate(
-      req.userId,
+      req.user.id,
       { lat, lon },
       { new: true }
     );
     
-    console.log("Updated rider location:", { riderId: req.userId, lat, lon });
+    console.log("Updated rider location:", { riderId: req.user.id, lat, lon });
     res.json(updatedRider);
   } catch (error) {
     console.error("Error updating rider location:", {
@@ -708,12 +614,12 @@ app.put("/api/rider/status", riderAuthMiddleware, async (req, res) => {
     if (typeof isOnline === 'boolean') updateData.isOnline = isOnline;
     
     const updatedRider = await Rider.findByIdAndUpdate(
-      req.userId,
+      req.user.id,
       updateData,
       { new: true }
     );
     
-    console.log("Updated rider status:", { riderId: req.userId, status, isOnline });
+    console.log("Updated rider status:", { riderId: req.user.id, status, isOnline });
     res.json(updatedRider);
   } catch (error) {
     console.error("Error updating rider status:", {
@@ -729,7 +635,7 @@ app.put("/api/rider/status", riderAuthMiddleware, async (req, res) => {
 // Get rider's current order
 app.get("/api/rider/current-order", riderAuthMiddleware, async (req, res) => {
   try {
-    const rider = await Rider.findById(req.userId).populate({
+    const rider = await Rider.findById(req.user.id).populate({
       path: 'currentOrder',
       populate: {
         path: 'restaurantId',
@@ -768,12 +674,12 @@ app.put("/api/rider/order-status/:orderId", riderAuthMiddleware, async (req, res
       return res.status(404).json({ message: "Order not found" });
     }
     
-    if (order.riderId?.toString() !== req.userId) {
+    if (order.riderId?.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to update this order" });
     }
     
     // Get rider details for tracking
-    const rider = await Rider.findById(req.userId);
+    const rider = await Rider.findById(req.user.id);
     if (!rider) {
       return res.status(404).json({ message: "Rider not found" });
     }
@@ -801,7 +707,7 @@ app.put("/api/rider/order-status/:orderId", riderAuthMiddleware, async (req, res
     // If order is delivered, update rider stats and free up rider
     if (status === "delivered") {
       const deliveryFee = 50; // Fixed delivery fee
-      await Rider.findByIdAndUpdate(req.userId, {
+      await Rider.findByIdAndUpdate(req.user.id, {
         status: "available",
         currentOrder: null,
         $inc: { 
@@ -813,7 +719,7 @@ app.put("/api/rider/order-status/:orderId", riderAuthMiddleware, async (req, res
       
       console.log("Order delivered with full tracking:", {
         orderId,
-        riderId: req.userId,
+        riderId: req.user.id,
         riderName: rider.name,
         restaurantName: updatedOrder.restaurantId.restaurantName,
         customerName: updatedOrder.customerName,
@@ -828,7 +734,7 @@ app.put("/api/rider/order-status/:orderId", riderAuthMiddleware, async (req, res
       console.log("Order status updated with tracking:", {
         orderId,
         status,
-        riderId: req.userId,
+        riderId: req.user.id,
         riderName: rider.name,
         restaurantName: updatedOrder.restaurantId.restaurantName,
         customerName: updatedOrder.customerName,
@@ -851,13 +757,13 @@ app.put("/api/rider/order-status/:orderId", riderAuthMiddleware, async (req, res
 // Get rider statistics
 app.get("/api/rider/stats", riderAuthMiddleware, async (req, res) => {
   try {
-    const rider = await Rider.findById(req.userId);
+    const rider = await Rider.findById(req.user.id);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     // Get today's deliveries
     const todayDeliveries = await Order.countDocuments({
-      riderId: req.userId,
+      riderId: req.user.id,
       status: "delivered",
       updatedAt: { $gte: today }
     });
@@ -887,7 +793,7 @@ app.get("/api/rider/stats", riderAuthMiddleware, async (req, res) => {
 // Comprehensive system analytics for admin
 app.get("/api/admin/analytics", authMiddleware, async (req, res) => {
   try {
-    if (req.userRole !== "admin") {
+    if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
     
@@ -1064,8 +970,8 @@ app.post("/api/chat/message", authMiddleware, async (req, res) => {
     
     // Add message
     const message = {
-      senderId: req.userId,
-      senderRole: req.userRole,
+      senderId: req.user.id,
+      senderRole: req.user.role,
       content: content.trim(),
       timestamp: new Date(),
       isRead: false
@@ -1085,12 +991,12 @@ app.post("/api/chat/message", authMiddleware, async (req, res) => {
 // Get user's chats
 app.get("/api/chat/user", authMiddleware, async (req, res) => {
   try {
-    if (req.userRole !== 'user') {
+    if (req.user.role !== 'user') {
       return res.status(403).json({ message: "User access required" });
     }
     
     const chats = await Chat.find({ 
-      userId: req.userId,
+      userId: req.user.id,
       isActive: true 
     })
     .populate('riderId', 'name')
@@ -1107,12 +1013,12 @@ app.get("/api/chat/user", authMiddleware, async (req, res) => {
 // Get rider's chats
 app.get("/api/chat/rider", authMiddleware, async (req, res) => {
   try {
-    if (req.userRole !== 'rider') {
+    if (req.user.role !== 'rider') {
       return res.status(403).json({ message: "Rider access required" });
     }
     
     const chats = await Chat.find({ 
-      riderId: req.userId,
+      riderId: req.user.id,
       isActive: true 
     })
     .populate('userId', 'name')
@@ -1138,7 +1044,7 @@ app.put("/api/chat/read/:orderId", authMiddleware, async (req, res) => {
     
     // Mark messages from other user as read
     chat.messages.forEach(message => {
-      if (message.senderId.toString() !== req.userId) {
+      if (message.senderId.toString() !== req.user.id) {
         message.isRead = true;
       }
     });
@@ -1151,7 +1057,69 @@ app.put("/api/chat/read/:orderId", authMiddleware, async (req, res) => {
   }
 });
 
-app.use("/api/auth", authRoutes);
+// Get order tracking information
+app.get("/api/orders/:orderId/tracking", authMiddleware, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    const order = await Order.findById(orderId)
+      .populate("restaurantId", "restaurantName lat lon")
+      .populate("riderId", "name email phone lat lon totalDeliveries totalEarnings")
+      .populate("userId", "name email phone");
+    
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+    
+    // Check if user has access to this order
+    if (req.user.role === 'user' && order.userId._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    if (req.user.role === 'restaurant' && order.restaurantId._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    if (req.user.role === 'rider' && order.riderId && order.riderId._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    // Calculate estimated delivery time if not set
+    if (!order.estimatedDeliveryTime) {
+      const estimatedTime = new Date();
+      estimatedTime.setMinutes(estimatedTime.getMinutes() + order.estimatedPreparationTime + 30); // 30 min for delivery
+      order.estimatedDeliveryTime = estimatedTime;
+      await order.save();
+    }
+    
+    console.log("Order tracking fetched:", {
+      orderId,
+      status: order.status,
+      customerName: order.customerName,
+      restaurantName: order.restaurantId.restaurantName,
+      riderName: order.riderId?.name || 'Not assigned'
+    });
+    
+    res.json({
+      order,
+      tracking: {
+        currentStatus: order.status,
+        estimatedDeliveryTime: order.estimatedDeliveryTime,
+        actualDeliveryTime: order.actualDeliveryTime,
+        preparationTime: order.actualPreparationTime || order.estimatedPreparationTime,
+        trackingUpdates: order.trackingUpdates
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching order tracking:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch order tracking", details: error.message });
+  }
+});
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -1174,48 +1142,229 @@ app.get("/", (req, res) => {
   res.json({ message: "Hello from server!" });
 });
 
+// Get user's orders
+app.get("/api/user/orders", authMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ userId: req.user.id })
+      .populate("restaurantId", "restaurantName lat lon")
+      .populate("riderId", "name email phone")
+      .sort({ createdAt: -1 });
+    
+    res.json(orders);
+  } catch (error) {
+    console.error("Error fetching user orders:", error);
+    res.status(500).json({ message: "Error fetching orders", error: error.message });
+  }
+});
+
+// Restaurant Dashboard Routes
+app.get("/api/restaurants/menu", restaurantAuthMiddleware, async (req, res) => {
+  try {
+    const menuItems = await MenuItem.find({ userId: req.user.id });
+    res.json(menuItems);
+  } catch (error) {
+    console.error("Error fetching restaurant menu:", error);
+    res.status(500).json({ message: "Error fetching menu items", error: error.message });
+  }
+});
+
+app.get("/api/restaurants/tables", restaurantAuthMiddleware, async (req, res) => {
+  try {
+    const tables = await Table.find({ restaurantId: req.user.id });
+    res.json(tables);
+  } catch (error) {
+    console.error("Error fetching restaurant tables:", error);
+    res.status(500).json({ message: "Error fetching tables", error: error.message });
+  }
+});
+
+app.get("/api/restaurants/orders", restaurantAuthMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find({ restaurantId: req.user.id })
+      .populate("riderId", "name email phone")
+      .sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error("Error fetching restaurant orders:", error);
+    res.status(500).json({ message: "Error fetching orders", error: error.message });
+  }
+});
+
+app.get("/api/restaurants/reservations", restaurantAuthMiddleware, async (req, res) => {
+  try {
+    const reservations = await TableReservation.find({ restaurantId: req.user.id })
+      .populate("tableId", "tableName capacity location")
+      .sort({ createdAt: -1 });
+    res.json(reservations);
+  } catch (error) {
+    console.error("Error fetching restaurant reservations:", error);
+    res.status(500).json({ message: "Error fetching reservations", error: error.message });
+  }
+});
+
+// Table availability checking
+app.get("/api/reservations/availability", async (req, res) => {
+  try {
+    const { restaurantId, date, time } = req.query;
+    
+    if (!restaurantId || !date || !time) {
+      return res.status(400).json({ message: "Restaurant ID, date, and time are required" });
+    }
+    
+    // Get all tables for the restaurant
+    const tables = await Table.find({ restaurantId, isActive: true });
+    
+    // Get booked tables for this date and time
+    const bookedReservations = await TableReservation.find({
+      restaurantId,
+      date,
+      time,
+      status: { $ne: 'cancelled' }
+    });
+    
+    const bookedTableIds = bookedReservations.map(reservation => reservation.tableId.toString());
+    
+    // Separate available and booked tables
+    const availableTables = tables.filter(table => !bookedTableIds.includes(table._id.toString()));
+    const bookedTables = tables.filter(table => bookedTableIds.includes(table._id.toString()));
+    
+    res.json({
+      available: availableTables,
+      booked: bookedTables,
+      total: tables.length,
+      availableCount: availableTables.length,
+      bookedCount: bookedTables.length
+    });
+  } catch (error) {
+    console.error("Error checking table availability:", error);
+    res.status(500).json({ message: "Error checking availability", error: error.message });
+  }
+});
+
+// Get tables for a specific restaurant (public route)
+app.get("/api/public/restaurants/:id/tables", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tables = await Table.find({ restaurantId: id, isActive: true });
+    res.json(tables);
+  } catch (error) {
+    console.error("Error fetching restaurant tables:", error);
+    res.status(500).json({ message: "Error fetching tables", error: error.message });
+  }
+});
+
+// Update reservation status
+app.patch("/api/reservations/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+    
+    const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    
+    const reservation = await TableReservation.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+    
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+    
+    res.json(reservation);
+  } catch (error) {
+    console.error("Error updating reservation status:", error);
+    res.status(500).json({ message: "Error updating status", error: error.message });
+  }
+});
+
 // Error handling for invalid routes
 app.use((req, res) => {
   console.error("404 Not Found", { method: req.method, url: req.url });
   res.status(404).json({ message: "Route not found" });
 });
 
-// Get user's orders
-app.get("/api/user/orders", authMiddleware, async (req, res) => {
+// Get menu for a specific restaurant (public route)
+app.get("/api/restaurants/:id/menu", async (req, res) => {
   try {
-    if (req.userRole !== 'user') {
-      return res.status(403).json({ message: "User access required" });
-    }
-    
-    // Find orders where the user is the customer
-    // Note: We need to match by customer email since orders are linked to restaurants
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    const orders = await Order.find({ 
-      customerEmail: user.email 
-    })
-    .populate("restaurantId", "restaurantName lat lon")
-    .populate("riderId", "name email phone lat lon")
-    .sort({ createdAt: -1 }); // Most recent first
-    
-    console.log("User fetched their orders:", {
-      userId: req.userId,
-      userEmail: user.email,
-      totalOrders: orders.length
-    });
-    
-    res.json(orders);
+    const { id } = req.params;
+    const menu = await MenuItem.find({ userId: id });
+    res.json(menu);
   } catch (error) {
-    console.error("Error fetching user orders:", {
-      message: error.message,
-      stack: error.stack,
+    console.error("Error fetching restaurant menu:", error);
+    res.status(500).json({ message: "Error fetching menu", error: error.message });
+  }
+});
+
+// Create new order
+app.post("/api/orders", authMiddleware, async (req, res) => {
+  try {
+    const {
+      restaurantId,
+      restaurantName,
+      customerName,
+      customerEmail,
+      customerPhone,
+      customerAddress,
+      items,
+      total,
+      orderType,
+      estimatedDeliveryTime,
+      paymentMethod,
+      specialInstructions
+    } = req.body;
+
+    // Generate unique order ID
+    const orderId = `ORD${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
+    const order = new Order({
+      orderId,
+      restaurantId,
+      restaurantName,
+      customerName,
+      customerEmail,
+      customerPhone,
+      customerAddress,
+      items,
+      total,
+      orderType,
+      estimatedDeliveryTime,
+      paymentMethod,
+      specialInstructions,
+      userId: req.user.id,
+      status: "pending",
+      kitchenStatus: "pending"
     });
-    res
-      .status(500)
-      .json({ message: "Failed to fetch orders", details: error.message });
+
+    await order.save();
+
+    // Emit socket event for real-time updates
+    io.emit('orderUpdate', {
+      orderId: order._id,
+      status: order.status,
+      restaurantId: order.restaurantId,
+      userId: order.userId
+    });
+
+    res.status(201).json({
+      message: "Order created successfully",
+      order: {
+        _id: order._id,
+        orderId: order.orderId,
+        status: order.status,
+        total: order.total
+      }
+    });
+  } catch (error) {
+    console.error("Error creating order:", error);
+    res.status(500).json({ message: "Error creating order", error: error.message });
   }
 });
 
@@ -1244,9 +1393,16 @@ checkPort(PORT, (err) => {
     console.error("Server startup error:", err);
     process.exit(1);
   }
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  
+  // Create HTTP server and initialize Socket.IO
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📡 Socket.IO initialized`);
+    console.log(`🔗 API available at http://localhost:${PORT}`);
   });
+  
+  // Initialize Socket.IO
+  initializeSocket(server);
 });
 
 // Generate random coordinates within Dhaka area

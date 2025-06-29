@@ -318,6 +318,126 @@
   font-weight: 500;
 }
 
+/* Reservations Section */
+.reservations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+}
+
+.reservation-card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 15px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.reservation-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(135deg, #ff6b6b, #ffa726);
+}
+
+.reservation-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+}
+
+.reservation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.reservation-id {
+  font-weight: 700;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.reservation-status {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-confirmed {
+  background: linear-gradient(135deg, #43e97b, #38f9d7);
+  color: white;
+}
+
+.status-pending {
+  background: linear-gradient(135deg, #ffd93d, #ffb347);
+  color: #8b4513;
+}
+
+.status-cancelled {
+  background: linear-gradient(135deg, #ff6b6b, #ffa726);
+  color: white;
+}
+
+.reservation-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.reservation-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.reservation-info-label {
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.reservation-info-value {
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.reservation-special-requests {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1rem;
+  border-left: 4px solid #ff6b6b;
+}
+
+.special-requests-label {
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.special-requests-value {
+  color: #2c3e50;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .admin-content {
@@ -342,6 +462,14 @@
   }
   
   .order-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .reservations-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .reservation-details {
     grid-template-columns: 1fr;
   }
   

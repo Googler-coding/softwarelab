@@ -3,10 +3,10 @@ import '../component/css/Footer.css';
 
 const Footer = () => {
     return (
-        <footer class="quickbite-footer">
-  <div class="container">
-    <div class="footer-top">
-      <div class="footer-column">
+        <footer className="quickbite-footer">
+  <div className="container">
+    <div className="footer-top">
+      <div className="footer-column">
         <h5>Popular Categories</h5>
         <ul>
           <li>Grocery Delivery Bangladesh</li>
@@ -24,7 +24,7 @@ const Footer = () => {
         </ul>
       </div>
 
-      <div class="footer-column">
+      <div className="footer-column">
         <h5>Get to Know Us</h5>
         <ul>
           <li>About Quickbite</li>
@@ -35,7 +35,7 @@ const Footer = () => {
         </ul>
       </div>
 
-      <div class="footer-column">
+      <div className="footer-column">
         <h5>Let Us Help You</h5>
         <ul>
           <li>Account Details</li>
@@ -45,7 +45,7 @@ const Footer = () => {
         </ul>
       </div>
 
-      <div class="footer-column">
+      <div className="footer-column">
         <h5>Doing Business</h5>
         <ul>
           <li>Become a Quickbite Partner</li>
@@ -56,7 +56,7 @@ const Footer = () => {
       </div>
     </div>
 
-    <div class="footer-bottom">
+    <div className="footer-bottom">
       <p>© 2025 Quickbite | Terms of Service | Privacy Policy | Delivery Locations</p>
     </div>
   </div>

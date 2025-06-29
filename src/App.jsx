@@ -9,8 +9,6 @@ import Middlepart4 from "./component/Middlepart4";
 import Middlepart5 from "./component/Middlepart5";
 import Deliverto from "./component/react_bootstrap/Deliverto";
 import Footer from "./component/Footer";
-import SignIn from "./component/react_bootstrap/SignIn";
-import SignUp from "./component/react_bootstrap/SignUp";
 import InRestaurantOrder from "./component/react_bootstrap/InRestaurantOrder";
 import RiderDashboard from "./component/react_bootstrap/RiderDashboard";
 import RestaurantDashboard from "./component/react_bootstrap/RestaurantDashboard";
@@ -180,8 +178,6 @@ function App() {
       <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} onLoginStateChange={handleLoginStateChange} />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/signin" element={<SignIn />} />
-        <Route path="/signup" element={<SignUp />} />
         <Route path="/in-restaurant-order" element={<InRestaurantOrder />} />
         <Route
           path="/restaurant-dashboard"

@@ -5,6 +5,7 @@ import "../css/AdminDashboard.css";
 
 const AdminDashboard = () => {
   const [orders, setOrders] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -18,6 +19,7 @@ const AdminDashboard = () => {
       return;
     }
     fetchOrders();
+    fetchReservations();
   }, [token, navigate]);
 
   const fetchOrders = async () => {
@@ -37,12 +39,32 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchReservations = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reservations`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to fetch reservations");
+      setReservations(data);
+    } catch (err) {
+      console.error("Error fetching reservations:", err);
+      // Don't set error for reservations as it's optional
+    }
+  };
+
   const getStatusCount = (status) => {
     return orders.filter(order => order.status === status).length;
   };
 
   const getTotalRevenue = () => {
     return orders.reduce((sum, order) => sum + order.total, 0);
+  };
+
+  const getReservationStatusCount = (status) => {
+    return reservations.filter(reservation => reservation.status === status).length;
   };
 
   if (loading) {
@@ -108,6 +130,18 @@ const AdminDashboard = () => {
                 {new Set(orders.map(order => order.restaurantId?._id || order.restaurantId)).size}
               </div>
               <div className="stat-label">Active Restaurants</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon">🍽️</div>
+              <div className="stat-number">{reservations.length}</div>
+              <div className="stat-label">Total Reservations</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-icon">📅</div>
+              <div className="stat-number">{getReservationStatusCount('confirmed')}</div>
+              <div className="stat-label">Confirmed Reservations</div>
             </div>
           </div>
         </div>
@@ -175,6 +209,67 @@ const AdminDashboard = () => {
                       <strong>Total: ${order.total.toFixed(2)}</strong>
                     </div>
                   </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Reservations Section */}
+        <div className="admin-section">
+          <div className="section-header">
+            <h3><span className="icon">🍽️</span> All Reservations</h3>
+          </div>
+          
+          <div className="reservations-grid">
+            {reservations.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">🍽️</div>
+                <div className="empty-state-text">No reservations found. Table reservations will appear here when customers make them.</div>
+              </div>
+            ) : (
+              reservations.map((reservation) => (
+                <div key={reservation._id} className="reservation-card">
+                  <div className="reservation-header">
+                    <div className="reservation-id">Table {reservation.tableName || reservation.tableNumber}</div>
+                    <span className={`reservation-status status-${reservation.status}`}>
+                      {reservation.status}
+                    </span>
+                  </div>
+                  
+                  <div className="reservation-details">
+                    <div className="reservation-info">
+                      <div className="reservation-info-label">Restaurant</div>
+                      <div className="reservation-info-value">
+                        {reservation.restaurantId?.restaurantName || 'Unknown Restaurant'}
+                      </div>
+                    </div>
+                    <div className="reservation-info">
+                      <div className="reservation-info-label">Customer</div>
+                      <div className="reservation-info-value">{reservation.customerName || "Unnamed"}</div>
+                    </div>
+                    <div className="reservation-info">
+                      <div className="reservation-info-label">Date</div>
+                      <div className="reservation-info-value">
+                        {new Date(reservation.reservationDate).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="reservation-info">
+                      <div className="reservation-info-label">Time</div>
+                      <div className="reservation-info-value">{reservation.reservationTime}</div>
+                    </div>
+                    <div className="reservation-info">
+                      <div className="reservation-info-label">Guests</div>
+                      <div className="reservation-info-value">{reservation.numberOfGuests}</div>
+                    </div>
+                  </div>
+                  
+                  {reservation.specialRequests && (
+                    <div className="reservation-special-requests">
+                      <div className="special-requests-label">Special Requests:</div>
+                      <div className="special-requests-value">{reservation.specialRequests}</div>
+                    </div>
+                  )}
                 </div>
               ))
             )}
